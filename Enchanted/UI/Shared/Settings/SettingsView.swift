@@ -20,6 +20,7 @@ struct SettingsView: View {
     @Binding var pingInterval: String
     @Binding var voiceIdentifier: String
     @Binding var enableExportImport: Bool
+    @Binding var enableConversationOrganization: Bool
     @State var ollamaStatus: Bool?
     var save: () -> ()
     var checkServer: () -> ()
@@ -176,6 +177,21 @@ struct SettingsView: View {
                         .autocapitalization(.none)
 #endif
 
+                    Section(header: Text("ORGANIZATION").font(.headline).padding(.top, 20)) {
+                        Toggle(isOn: $enableConversationOrganization) {
+                            Label("Enable Tags & Folders", systemImage: "folder.badge.gearshape")
+                                .foregroundStyle(Color.label)
+                        }
+
+                        if enableConversationOrganization {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Organize conversations with tags, folders, and advanced search.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+                            }
+                        }
+                    }
+
                     Section(header: Text("BACKUP & EXPORT").font(.headline).padding(.top, 20)) {
                         Toggle(isOn: $enableExportImport) {
                             Label("Enable Export/Import", systemImage: "arrow.up.arrow.down.circle")
@@ -248,6 +264,7 @@ struct SettingsView: View {
         pingInterval: .constant("5"),
         voiceIdentifier: .constant("sample"),
         enableExportImport: .constant(true),
+        enableConversationOrganization: .constant(true),
         save: {},
         checkServer: {},
         deleteAll: {},

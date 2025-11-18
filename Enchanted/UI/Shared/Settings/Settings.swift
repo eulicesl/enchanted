@@ -24,6 +24,7 @@ struct Settings: View {
     @AppStorage("pingInterval") private var pingInterval: String = "5"
     @AppStorage("voiceIdentifier") private var voiceIdentifier: String = ""
     @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
+    @AppStorage("feature.conversationOrganization") private var enableConversationOrganization: Bool = false
 
     @StateObject private var speechSynthesiser = SpeechSynthesizer.shared
 
@@ -167,6 +168,7 @@ struct Settings: View {
             pingInterval: $pingInterval,
             voiceIdentifier: $voiceIdentifier,
             enableExportImport: $enableExportImport,
+            enableConversationOrganization: $enableConversationOrganization,
             save: save,
             checkServer: checkServer,
             deleteAll: deleteAll,
