@@ -19,13 +19,16 @@ struct SettingsView: View {
     @Binding var appUserInitials: String
     @Binding var pingInterval: String
     @Binding var voiceIdentifier: String
+    @Binding var enableExportImport: Bool
     @State var ollamaStatus: Bool?
     var save: () -> ()
     var checkServer: () -> ()
     var deleteAll: () -> ()
+    var exportConversations: () -> ()
+    var importConversations: () -> ()
     var ollamaLangugeModels: [LanguageModelSD]
     var voices: [AVSpeechSynthesisVoice]
-    
+
     @State private var deleteConversationsDialog = false
     
     var body: some View {
@@ -172,15 +175,50 @@ struct SettingsView: View {
                         .keyboardType(.URL)
                         .autocapitalization(.none)
 #endif
-                    
+
+                    Section(header: Text("BACKUP & EXPORT").font(.headline).padding(.top, 20)) {
+                        Toggle(isOn: $enableExportImport) {
+                            Label("Enable Export/Import", systemImage: "arrow.up.arrow.down.circle")
+                                .foregroundStyle(Color.label)
+                        }
+
+                        if enableExportImport {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Export your conversations to JSON or Markdown format for backup or sharing.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+
+                                Button(action: exportConversations) {
+                                    HStack {
+                                        Spacer()
+                                        Label("Export All Conversations", systemImage: "square.and.arrow.up")
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.borderedProminent)
+
+                                Button(action: importConversations) {
+                                    HStack {
+                                        Spacer()
+                                        Label("Import Conversations", systemImage: "square.and.arrow.down")
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+
                     Button(action: {deleteConversationsDialog.toggle()}) {
                         HStack {
                             Spacer()
-                            
+
                             Text("Clear All Data")
                                 .foregroundStyle(Color(.systemRed))
                                 .padding(.vertical, 6)
-                            
+
                             Spacer()
                         }
                     }
@@ -209,9 +247,12 @@ struct SettingsView: View {
         appUserInitials: .constant("AM"),
         pingInterval: .constant("5"),
         voiceIdentifier: .constant("sample"),
+        enableExportImport: .constant(true),
         save: {},
         checkServer: {},
         deleteAll: {},
+        exportConversations: {},
+        importConversations: {},
         ollamaLangugeModels: LanguageModelSD.sample,
         voices: []
     )

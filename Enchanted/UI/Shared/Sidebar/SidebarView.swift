@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @Environment(\.openWindow) var openWindow
@@ -17,6 +18,11 @@ struct SidebarView: View {
     @State var showSettings = false
     @State var showCompletions = false
     @State var showKeyboardShortcutas = false
+    @State private var showingExportOptions = false
+    @State private var conversationToExport: ConversationSD?
+    @State private var exportMessage: String?
+    @State private var showingExportSuccess = false
+    @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
     
     private func onSettingsTap() {
         Task {
@@ -24,7 +30,63 @@ struct SidebarView: View {
             await Haptics.shared.mediumTap()
         }
     }
-    
+
+    private func onExportConversation(_ conversation: ConversationSD) {
+        guard enableExportImport else { return }
+        conversationToExport = conversation
+        showingExportOptions = true
+    }
+
+    private func performExport(format: ExportImportService.ExportFormat) {
+        guard let conversation = conversationToExport else { return }
+
+        Task {
+            do {
+                let exportService = ExportImportService.shared
+                let fileURL = try await exportService.exportConversation(conversation, format: format)
+
+                await MainActor.run {
+                    shareFile(url: fileURL)
+                }
+            } catch {
+                await MainActor.run {
+                    exportMessage = "Export failed: \(error.localizedDescription)"
+                    showingExportSuccess = true
+                }
+            }
+        }
+    }
+
+    private func shareFile(url: URL) {
+#if os(macOS)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = url.lastPathComponent
+        panel.allowedContentTypes = url.pathExtension == "json" ? [.json] : [UTType(filenameExtension: "md")!]
+        panel.begin { response in
+            if response == .OK, let saveURL = panel.url {
+                do {
+                    if FileManager.default.fileExists(atPath: saveURL.path) {
+                        try FileManager.default.removeItem(at: saveURL)
+                    }
+                    try FileManager.default.copyItem(at: url, to: saveURL)
+                    exportMessage = "Export successful: \(saveURL.lastPathComponent)"
+                    showingExportSuccess = true
+                } catch {
+                    exportMessage = "Failed to save file: \(error.localizedDescription)"
+                    showingExportSuccess = true
+                }
+            }
+        }
+#else
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
+#endif
+    }
+
     var body: some View {
         VStack {
             ScrollView() {
@@ -33,7 +95,8 @@ struct SidebarView: View {
                     conversations: conversations,
                     onTap: onConversationTap,
                     onDelete: onConversationDelete,
-                    onDeleteDailyConversations: onDeleteDailyConversations
+                    onDeleteDailyConversations: onDeleteDailyConversations,
+                    onExport: enableExportImport ? onExportConversation : nil
                 )
             }
             .scrollIndicators(.never)
@@ -64,7 +127,27 @@ struct SidebarView: View {
             KeyboardShortcutsDemo()
         }
 #endif
-        
+        .confirmationDialog("Export Format", isPresented: $showingExportOptions) {
+            Button("Export as JSON") {
+                performExport(format: .json)
+            }
+            Button("Export as Markdown") {
+                performExport(format: .markdown)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose export format for this conversation")
+        }
+        .alert("Export", isPresented: $showingExportSuccess) {
+            Button("OK", role: .cancel) {
+                exportMessage = nil
+            }
+        } message: {
+            if let message = exportMessage {
+                Text(message)
+            }
+        }
+
     }
 }
 

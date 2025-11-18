@@ -27,6 +27,7 @@ struct ConversationHistoryList: View {
     var onTap: (_ conversation: ConversationSD) -> ()
     var onDelete: (_ conversation: ConversationSD) -> ()
     var onDeleteDailyConversations: (_ date: Date) -> ()
+    var onExport: ((_ conversation: ConversationSD) -> ())? = nil
     
     func groupConversationsByDay(conversations: [ConversationSD]) -> [ConversationGroup] {
         let groupedDictionary = Dictionary(grouping: conversations) { (conversation) -> Date in
@@ -81,6 +82,12 @@ struct ConversationHistoryList: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu(menuItems: {
+                        if let onExport = onExport {
+                            Button(action: { onExport(dailyConversation) }) {
+                                Label("Export Conversation", systemImage: "square.and.arrow.up")
+                            }
+                            Divider()
+                        }
                         Button(role: .destructive, action: { onDelete(dailyConversation) }) {
                             Label("Delete", systemImage: "trash")
                         }
