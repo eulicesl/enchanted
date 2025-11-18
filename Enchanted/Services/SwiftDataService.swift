@@ -21,17 +21,19 @@ final actor SwiftDataService: ModelActor {
                 LanguageModelSD.self,
                 ConversationSD.self,
                 MessageSD.self,
-                CompletionInstructionSD.self
+                CompletionInstructionSD.self,
+                ConversationTagSD.self,
+                ConversationFolderSD.self
             ])
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            
+
             do {
                 return try ModelContainer(for: schema, configurations: [modelConfiguration])
             } catch {
                 fatalError("Could not create ModelContainer: \(error)")
             }
         }()
-        
+
         self.modelContext = ModelContext(sharedModelContainer)
         self.modelContext.autosaveEnabled = false
         modelContainer = sharedModelContainer
@@ -155,6 +157,73 @@ extension SwiftDataService {
     }
 }
 
+// MARK: - Tags (Feature 1)
+extension SwiftDataService {
+    func fetchTags() throws -> [ConversationTagSD] {
+        let sortDescriptor = SortDescriptor(\ConversationTagSD.order, order: .forward)
+        let fetchDescriptor = FetchDescriptor<ConversationTagSD>(sortBy: [sortDescriptor])
+        return try modelContext.fetch(fetchDescriptor)
+    }
+
+    func createTag(_ tag: ConversationTagSD) throws {
+        modelContext.insert(tag)
+        try modelContext.saveChanges()
+    }
+
+    func updateTag(_ tag: ConversationTagSD) throws {
+        try modelContext.saveChanges()
+    }
+
+    func deleteTag(_ tag: ConversationTagSD) throws {
+        modelContext.delete(tag)
+        try modelContext.saveChanges()
+    }
+
+    func getTag(_ tagId: UUID) throws -> ConversationTagSD? {
+        let predicate = #Predicate<ConversationTagSD>{ $0.id == tagId }
+        let fetchDescriptor = FetchDescriptor<ConversationTagSD>(predicate: predicate)
+        let tags = try modelContext.fetch(fetchDescriptor)
+        return tags.first
+    }
+}
+
+// MARK: - Folders (Feature 1)
+extension SwiftDataService {
+    func fetchFolders() throws -> [ConversationFolderSD] {
+        let sortDescriptor = SortDescriptor(\ConversationFolderSD.order, order: .forward)
+        let fetchDescriptor = FetchDescriptor<ConversationFolderSD>(sortBy: [sortDescriptor])
+        return try modelContext.fetch(fetchDescriptor)
+    }
+
+    func fetchRootFolders() throws -> [ConversationFolderSD] {
+        let predicate = #Predicate<ConversationFolderSD>{ $0.parentFolder == nil }
+        let sortDescriptor = SortDescriptor(\ConversationFolderSD.order, order: .forward)
+        let fetchDescriptor = FetchDescriptor<ConversationFolderSD>(predicate: predicate, sortBy: [sortDescriptor])
+        return try modelContext.fetch(fetchDescriptor)
+    }
+
+    func createFolder(_ folder: ConversationFolderSD) throws {
+        modelContext.insert(folder)
+        try modelContext.saveChanges()
+    }
+
+    func updateFolder(_ folder: ConversationFolderSD) throws {
+        try modelContext.saveChanges()
+    }
+
+    func deleteFolder(_ folder: ConversationFolderSD) throws {
+        modelContext.delete(folder)
+        try modelContext.saveChanges()
+    }
+
+    func getFolder(_ folderId: UUID) throws -> ConversationFolderSD? {
+        let predicate = #Predicate<ConversationFolderSD>{ $0.id == folderId }
+        let fetchDescriptor = FetchDescriptor<ConversationFolderSD>(predicate: predicate)
+        let folders = try modelContext.fetch(fetchDescriptor)
+        return folders.first
+    }
+}
+
 // MARK: - General
 extension SwiftDataService {
     func deleteEverything() throws {
@@ -162,6 +231,8 @@ extension SwiftDataService {
         try modelContext.delete(model: LanguageModelSD.self)
         try modelContext.delete(model: MessageSD.self)
         try modelContext.delete(model: CompletionInstructionSD.self)
+        try modelContext.delete(model: ConversationTagSD.self)
+        try modelContext.delete(model: ConversationFolderSD.self)
         try modelContext.saveChanges()
     }
 }

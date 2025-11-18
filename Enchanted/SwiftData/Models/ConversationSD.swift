@@ -21,11 +21,23 @@ final class ConversationSD: Identifiable {
 
     @Relationship(deleteRule: .cascade, inverse: \MessageSD.conversation)
     var messages: [MessageSD] = []
-    
+
+    // MARK: - Organization (Feature 1)
+    // Optional relationships for conversation organization
+    // Nullable for backward compatibility with existing conversations
+
+    @Relationship(deleteRule: .nullify)
+    var tags: [ConversationTagSD]?
+
+    @Relationship(deleteRule: .nullify)
+    var folder: ConversationFolderSD?
+
     init(name: String, updatedAt: Date = Date.now) {
         self.name = name
         self.updatedAt = updatedAt
         self.createdAt = updatedAt
+        self.tags = []
+        self.folder = nil
     }
 }
 
