@@ -21,6 +21,7 @@ struct SettingsView: View {
     @Binding var voiceIdentifier: String
     @Binding var enableExportImport: Bool
     @Binding var enableConversationOrganization: Bool
+    @Binding var enableModelComparison: Bool
     @State var ollamaStatus: Bool?
     var save: () -> ()
     var checkServer: () -> ()
@@ -186,6 +187,21 @@ struct SettingsView: View {
                         if enableConversationOrganization {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Organize conversations with tags, folders, and advanced search.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+                            }
+                        }
+                    }
+
+                    Section(header: Text("MODEL COMPARISON").font(.headline).padding(.top, 20)) {
+                        Toggle(isOn: $enableModelComparison) {
+                            Label("Enable Model Comparison", systemImage: "square.split.2x1")
+                                .foregroundStyle(Color.label)
+                        }
+
+                        if enableModelComparison {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Compare responses from multiple models side-by-side for the same prompt.")
                                     .font(.caption)
                                     .foregroundStyle(Color(.secondaryLabel))
                             }

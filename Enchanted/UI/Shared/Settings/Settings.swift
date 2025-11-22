@@ -25,6 +25,7 @@ struct Settings: View {
     @AppStorage("voiceIdentifier") private var voiceIdentifier: String = ""
     @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
     @AppStorage("feature.conversationOrganization") private var enableConversationOrganization: Bool = false
+    @AppStorage("feature.modelComparison") private var enableModelComparison: Bool = false
 
     @StateObject private var speechSynthesiser = SpeechSynthesizer.shared
 
@@ -169,6 +170,7 @@ struct Settings: View {
             voiceIdentifier: $voiceIdentifier,
             enableExportImport: $enableExportImport,
             enableConversationOrganization: $enableConversationOrganization,
+            enableModelComparison: $enableModelComparison,
             save: save,
             checkServer: checkServer,
             deleteAll: deleteAll,

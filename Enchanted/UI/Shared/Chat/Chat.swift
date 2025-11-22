@@ -14,7 +14,9 @@ struct Chat: View, Sendable {
     @AppStorage("systemPrompt") private var systemPrompt: String = ""
     @AppStorage("appUserInitials") private var userInitials: String = ""
     @AppStorage("defaultOllamaModel") private var defaultOllamaModel: String = ""
+    @AppStorage("feature.modelComparison") private var enableModelComparison: Bool = false
     @State var showMenu = false
+    @State private var showComparisonView = false
     
     init(languageModelStore: LanguageModelStore, conversationStore: ConversationStore, appStore: AppStore) {
         _languageModelStore = State(initialValue: languageModelStore)
@@ -145,6 +147,15 @@ struct Chat: View, Sendable {
                 userInitials: userInitials,
                 copyChat: copyChat
             )
+            .toolbar {
+                if enableModelComparison {
+                    ToolbarItem(placement: .automatic) {
+                        Button(action: { showComparisonView.toggle() }) {
+                            Label("Model Comparison", systemImage: "square.split.2x1")
+                        }
+                    }
+                }
+            }
 #else
             SideBarStack(sidebarWidth: 300,showSidebar: $showMenu, sidebar: {
                 SidebarView(
@@ -171,7 +182,22 @@ struct Chat: View, Sendable {
                     userInitials: userInitials
                 )
             }
+            .toolbar {
+                if enableModelComparison {
+                    ToolbarItem(placement: .automatic) {
+                        Button(action: { showComparisonView.toggle() }) {
+                            Label("Model Comparison", systemImage: "square.split.2x1")
+                        }
+                    }
+                }
+            }
 #endif
+        }
+        .sheet(isPresented: $showComparisonView) {
+            ComparisonView(
+                languageModelStore: languageModelStore,
+                availableModels: languageModelStore.models
+            )
         }
         .onChange(of: languageModelStore.models, { _, modelsList in
             if languageModelStore.selectedModel == nil {
