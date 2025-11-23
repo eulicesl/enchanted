@@ -161,8 +161,7 @@ final class ComparisonStore: Sendable {
         // Throttle UI updates
         throttlers[modelId]?.throttle { [weak self] in
             guard let self = self else { return }
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
+            Task { @MainActor in
                 let bufferedContent = self.messageBuffers[modelId, default: ""]
                 self.currentSession?.updateResponse(
                     for: modelId,

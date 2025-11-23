@@ -125,11 +125,15 @@ extension Color {
 
     /// Convert Color to hex string
     var hexString: String? {
-        guard let components = UIColor(self).cgColor.components else { return nil }
+        guard let cgColor = UIColor(self).cgColor else { return nil }
+
+        // Convert to sRGB color space to handle different color spaces (like grayscale)
+        guard let srgbColor = cgColor.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil) else { return nil }
+        guard let components = srgbColor.components, components.count >= 3 else { return nil }
 
         let r = Float(components[0])
-        let g = Float(components.count > 1 ? components[1] : components[0])
-        let b = Float(components.count > 2 ? components[2] : components[0])
+        let g = Float(components[1])
+        let b = Float(components[2])
 
         return String(format: "#%02lX%02lX%02lX",
                      lroundf(r * 255),

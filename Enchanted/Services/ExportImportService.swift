@@ -189,9 +189,9 @@ actor ExportImportService {
     }
 
     enum MergeStrategy {
-        case createNew          // Always create new conversation with new UUID
-        case skipExisting       // Skip if conversation with same ID exists
-        case replaceExisting    // Replace if conversation with same ID exists
+        case createNew              // Always create new conversation with new UUID
+        case skipExisting           // Skip if conversation with same ID exists
+        case deleteAndCreateNew     // Delete existing conversation and create new one with same ID
     }
 
     // MARK: - Private Helper Methods
@@ -298,7 +298,7 @@ actor ExportImportService {
             if existingConversation != nil {
                 return // Skip this conversation
             }
-        case .replaceExisting:
+        case .deleteAndCreateNew:
             if let existing = existingConversation {
                 try await swiftDataService.deleteConversation(existing)
             }

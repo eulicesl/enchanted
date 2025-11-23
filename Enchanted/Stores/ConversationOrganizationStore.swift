@@ -71,8 +71,9 @@ final class ConversationOrganizationStore: Sendable {
     func reorderTags(_ tags: [ConversationTagSD]) async throws {
         for (index, tag) in tags.enumerated() {
             tag.order = index
-            try await swiftDataService.updateTag(tag)
         }
+        // Batch update - single save operation
+        try await swiftDataService.updateTags(tags)
         try await loadTags()
     }
 

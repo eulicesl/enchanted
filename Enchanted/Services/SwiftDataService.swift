@@ -174,6 +174,11 @@ extension SwiftDataService {
         try modelContext.saveChanges()
     }
 
+    func updateTags(_ tags: [ConversationTagSD]) throws {
+        // Tags are already modified in memory, just need one save
+        try modelContext.saveChanges()
+    }
+
     func deleteTag(_ tag: ConversationTagSD) throws {
         modelContext.delete(tag)
         try modelContext.saveChanges()

@@ -153,8 +153,8 @@ struct ComparisonSession: Identifiable, Sendable {
                 responses[index].endTime = Date()
 
                 // Calculate response time if we have start time
-                if let startTime = responses[index].startTime {
-                    responses[index].responseTime = Date().timeIntervalSince(startTime)
+                if let startTime = responses[index].startTime, let endTime = responses[index].endTime {
+                    responses[index].responseTime = endTime.timeIntervalSince(startTime)
                 }
             }
         }
