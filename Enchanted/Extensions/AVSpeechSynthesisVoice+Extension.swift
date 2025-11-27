@@ -14,16 +14,25 @@ extension AVSpeechSynthesisVoice {
         if name.lowercased().contains("default") || name.lowercased().contains("premium") || name.lowercased().contains("enhanced") {
             return name
         }
-        
-        let qualityString = {
-            switch self.quality.rawValue {
-            case 1: return "Default"
-            case 2: return "Enhanced"
-            case 3: return "Premium"
-            default: return "Unknown"
-            }
-        }()
-        
-        return "\(name) (\(qualityString))"
+
+        // Only append quality for enhanced and premium voices
+        if let qualityString = self.quality.displayString {
+            return "\(name) (\(qualityString))"
+        }
+
+        return name
+    }
+}
+
+extension AVSpeechSynthesisVoiceQuality {
+    var displayString: String? {
+        switch self {
+        case .enhanced:
+            return "Enhanced"
+        case .premium:
+            return "Premium"
+        default:
+            return nil  // Don't show "Default" quality
+        }
     }
 }

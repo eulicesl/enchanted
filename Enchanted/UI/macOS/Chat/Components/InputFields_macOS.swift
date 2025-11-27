@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct InputFieldsView: View {
+    private let maxTextFieldHeight: CGFloat = 130
+
     @Binding var message: String
     var conversationState: ConversationState
     var onStopGenerateTap: @MainActor () -> Void
@@ -20,6 +22,7 @@ struct InputFieldsView: View {
     @State private var selectedImage: Image?
     @State private var fileDropActive: Bool = false
     @State private var fileSelectingActive: Bool = false
+    @State private var textFieldHeight: CGFloat = 40
     @FocusState private var isFocusedInput: Bool
     
     @MainActor private func sendMessage() {
@@ -69,29 +72,42 @@ struct InputFieldsView: View {
             }
             
             ZStack(alignment: .trailing) {
-                TextField("Message", text: $message.animation(.easeOut(duration: 0.3)), axis: .vertical)
-                    .focused($isFocusedInput)
-                    .font(.system(size: 14))
-                    .frame(maxWidth:.infinity, minHeight: 40)
-                    .clipped()
-                    .textFieldStyle(.plain)
+                ScrollView {
+                    TextField("Message", text: $message.animation(.easeOut(duration: 0.3)), axis: .vertical)
+                        .focused($isFocusedInput)
+                        .font(.system(size: 14))
+                        .frame(maxWidth:.infinity, minHeight: 40)
+                        .clipped()
+                        .textFieldStyle(.plain)
 #if os(macOS)
-                    .onSubmit {
-                        if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
-                            message += "\n"
-                        } else {
-                            sendMessage()
+                        .onSubmit {
+                            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+                                message += "\n"
+                            } else {
+                                sendMessage()
+                            }
                         }
-                    }
 #endif
-                /// TextField bypasses drop area
-                    .allowsHitTesting(!fileDropActive)
+                    /// TextField bypasses drop area
+                        .allowsHitTesting(!fileDropActive)
 #if os(macOS)
-                    .addCustomHotkeys(hotkeys)
+                        .addCustomHotkeys(hotkeys)
 #endif
-                    .padding(.trailing, 80)
-                
-                
+                        .padding(.trailing, 80)
+                        .overlay(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .preference(key: ViewHeightKey.self, value: geometry.size.height)
+                            }
+                        )
+                        .onPreferenceChange(ViewHeightKey.self) { height in
+                            withAnimation {
+                                textFieldHeight = height
+                            }
+                        }
+                }
+                .frame(maxHeight: min(textFieldHeight, maxTextFieldHeight))
+
                 HStack {
                     RecordingView(isRecording: $isRecording.animation()) { transcription in
                         withAnimation(.easeIn(duration: 0.3)) {
@@ -161,6 +177,13 @@ struct InputFieldsView: View {
             // allow focusing text area on greater tap area
             isFocusedInput = true
         }
+    }
+}
+
+struct ViewHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 40
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
