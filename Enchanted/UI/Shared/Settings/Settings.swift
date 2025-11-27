@@ -22,7 +22,7 @@ struct Settings: View {
     @AppStorage("ollamaBearerToken") private var ollamaBearerToken: String = ""
     @AppStorage("appUserInitials") private var appUserInitials: String = ""
     @AppStorage("pingInterval") private var pingInterval: String = "5"
-    @AppStorage("voiceIdentifier") private var voiceIdentifier: String = ""
+    @AppStorage("voiceIdentifier") private var voiceIdentifier: String = SpeechSynthesizer.systemDefaultVoiceIdentifier()
     @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
     @AppStorage("feature.conversationOrganization") private var enableConversationOrganization: Bool = false
     @AppStorage("feature.modelComparison") private var enableModelComparison: Bool = false
