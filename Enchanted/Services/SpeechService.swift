@@ -126,13 +126,17 @@ class SpeechSynthesizerDelegate: NSObject, AVSpeechSynthesizerDelegate {
         // Get the current system language
         let currentLanguage = Locale.current.language.languageCode?.identifier ?? "en"
 
-        // Filter voices to current language and remove duplicates
+        // Filter voices to current language
+        let languageFilteredVoices = allVoices.filter { voice in
+            voice.language.starts(with: currentLanguage)
+        }
+
+        // Use language-filtered voices if available, otherwise fall back to all voices
+        let voicesToProcess = languageFilteredVoices.isEmpty ? allVoices : languageFilteredVoices
+
+        // Remove duplicates and sort
         var seenVoices: Set<String> = []
-        let filteredVoices = allVoices
-            .filter { voice in
-                // Include voices that match the current language
-                voice.language.starts(with: currentLanguage)
-            }
+        let voices = voicesToProcess
             .filter { voice in
                 // Remove duplicates by name + quality combination
                 let key = "\(voice.name)-\(voice.quality.rawValue)"
@@ -149,9 +153,6 @@ class SpeechSynthesizerDelegate: NSObject, AVSpeechSynthesizerDelegate {
                 }
                 return firstVoice.prettyName < secondVoice.prettyName
             }
-
-        // If no voices match the current language, fall back to all voices
-        let voices = filteredVoices.isEmpty ? allVoices.sorted { $0.quality.rawValue > $1.quality.rawValue } : filteredVoices
 
         // Prevent state refresh if there are no new elements
         let diff = self.voices.elementsEqual(voices, by: { $0.identifier == $1.identifier })

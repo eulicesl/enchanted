@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct InputFieldsView: View {
+    private let maxTextFieldHeight: CGFloat = 130
+
     @Binding var message: String
     var conversationState: ConversationState
     var onStopGenerateTap: @MainActor () -> Void
@@ -104,7 +106,7 @@ struct InputFieldsView: View {
                             }
                         }
                 }
-                .frame(maxHeight: min(textFieldHeight, 130))
+                .frame(maxHeight: min(textFieldHeight, maxTextFieldHeight))
 
                 HStack {
                     RecordingView(isRecording: $isRecording.animation()) { transcription in
