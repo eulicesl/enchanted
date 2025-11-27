@@ -70,43 +70,41 @@ struct InputFieldsView: View {
             }
             
             ZStack(alignment: .trailing) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        TextField("Message", text: $message.animation(.easeOut(duration: 0.3)), axis: .vertical)
-                            .focused($isFocusedInput)
-                            .font(.system(size: 14))
-                            .frame(maxWidth:.infinity, minHeight: 40)
-                            .clipped()
-                            .textFieldStyle(.plain)
+                ScrollView {
+                    TextField("Message", text: $message.animation(.easeOut(duration: 0.3)), axis: .vertical)
+                        .focused($isFocusedInput)
+                        .font(.system(size: 14))
+                        .frame(maxWidth:.infinity, minHeight: 40)
+                        .clipped()
+                        .textFieldStyle(.plain)
 #if os(macOS)
-                            .onSubmit {
-                                if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
-                                    message += "\n"
-                                } else {
-                                    sendMessage()
-                                }
+                        .onSubmit {
+                            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+                                message += "\n"
+                            } else {
+                                sendMessage()
                             }
+                        }
 #endif
-                        /// TextField bypasses drop area
-                            .allowsHitTesting(!fileDropActive)
+                    /// TextField bypasses drop area
+                        .allowsHitTesting(!fileDropActive)
 #if os(macOS)
-                            .addCustomHotkeys(hotkeys)
+                        .addCustomHotkeys(hotkeys)
 #endif
-                            .padding(.trailing, 80)
-                            .overlay(
-                                GeometryReader { geometry in
-                                    Color.clear
-                                        .preference(key: ViewHeightKey.self, value: geometry.size.height)
-                                }
-                            )
-                            .onPreferenceChange(ViewHeightKey.self) { height in
-                                withAnimation {
-                                    textFieldHeight = height
-                                }
+                        .padding(.trailing, 80)
+                        .overlay(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .preference(key: ViewHeightKey.self, value: geometry.size.height)
                             }
-                    }
-                    .frame(maxHeight: min(textFieldHeight, 130))
+                        )
+                        .onPreferenceChange(ViewHeightKey.self) { height in
+                            withAnimation {
+                                textFieldHeight = height
+                            }
+                        }
                 }
+                .frame(maxHeight: min(textFieldHeight, 130))
 
                 HStack {
                     RecordingView(isRecording: $isRecording.animation()) { transcription in
