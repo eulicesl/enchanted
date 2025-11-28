@@ -2,7 +2,7 @@
 //  AskEnchantedIntent.swift
 //  Enchanted
 //
-//  Created by Claude on 2024.
+//  Created by Claude on 2025.
 //
 
 import AppIntents
@@ -125,10 +125,13 @@ struct AskEnchantedIntent: AppIntent {
 
         return messages
             .sorted { $0.createdAt < $1.createdAt }
-            .map { OKChatRequestData.Message(
-                role: OKChatRequestData.Message.Role(rawValue: $0.role) ?? .assistant,
-                content: $0.content
-            )}
+            .compactMap { message in
+                // Filter out messages with unknown roles to prevent malformed history
+                guard let role = OKChatRequestData.Message.Role(rawValue: message.role) else {
+                    return nil
+                }
+                return OKChatRequestData.Message(role: role, content: message.content)
+            }
     }
 
     private func executeChat(request: OKChatRequestData) async throws -> String {

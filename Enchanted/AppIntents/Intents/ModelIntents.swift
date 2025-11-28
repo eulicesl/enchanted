@@ -2,7 +2,7 @@
 //  ModelIntents.swift
 //  Enchanted
 //
-//  Created by Claude on 2024.
+//  Created by Claude on 2025.
 //
 
 import AppIntents

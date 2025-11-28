@@ -2,7 +2,7 @@
 //  EnchantedShortcuts.swift
 //  Enchanted
 //
-//  Created by Claude on 2024.
+//  Created by Claude on 2025.
 //
 
 import AppIntents
@@ -125,5 +125,47 @@ extension StartConversationIntent {
 extension GetConversationsIntent {
     static var appIntentCategory: some AppIntentCategory {
         return .search
+    }
+}
+
+extension SearchConversationsIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .search
+    }
+}
+
+extension GetLatestConversationIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .search
+    }
+}
+
+extension DeleteConversationIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .delete
+    }
+}
+
+extension GetModelsIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .information
+    }
+}
+
+extension SetDefaultModelIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .configure
+    }
+}
+
+extension GetDefaultModelIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .information
+    }
+}
+
+extension CheckServerStatusIntent {
+    static var appIntentCategory: some AppIntentCategory {
+        return .information
     }
 }

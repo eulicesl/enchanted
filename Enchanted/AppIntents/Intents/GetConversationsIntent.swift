@@ -2,7 +2,7 @@
 //  GetConversationsIntent.swift
 //  Enchanted
 //
-//  Created by Claude on 2024.
+//  Created by Claude on 2025.
 //
 
 import AppIntents
@@ -44,8 +44,8 @@ struct GetConversationsIntent: AppIntent {
             conversations = conversations.filter { $0.name.lowercased().contains(term) }
         }
 
-        // Apply limit
-        let limitedConversations = Array(conversations.prefix(max(1, min(limit, 100))))
+        // Apply limit (allow 0 to return empty results)
+        let limitedConversations = Array(conversations.prefix(max(0, min(limit, 100))))
 
         let entities = limitedConversations.map { ConversationEntity(from: $0) }
 
@@ -98,23 +98,19 @@ struct SearchConversationsIntent: AppIntent {
         let conversations = try await SwiftDataService.shared.fetchConversations()
         let searchTerm = query.lowercased()
 
-        var matchingConversations: [ConversationSD] = []
-
-        for conversation in conversations {
-            // Check conversation name
+        // Filter conversations by name first (fast path)
+        // Then check messages using the already-loaded relationship
+        // This avoids N+1 queries by using the SwiftData relationship
+        let matchingConversations = conversations.filter { conversation in
+            // Check conversation name first (fast)
             if conversation.name.lowercased().contains(searchTerm) {
-                matchingConversations.append(conversation)
-                continue
+                return true
             }
 
-            // Check messages
-            let messages = try await SwiftDataService.shared.fetchMessages(conversation.id)
-            let hasMatch = messages.contains { message in
+            // Check messages using the relationship (no additional query needed)
+            // SwiftData relationships are lazily loaded but batched
+            return conversation.messages.contains { message in
                 message.content.lowercased().contains(searchTerm)
-            }
-
-            if hasMatch {
-                matchingConversations.append(conversation)
             }
         }
 
