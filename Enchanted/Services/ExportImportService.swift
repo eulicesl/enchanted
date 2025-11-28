@@ -87,7 +87,7 @@ actor ExportImportService {
     }
 
     enum ExportError: LocalizedError {
-        case noConversations
+        case noDataToExport
         case encodingFailed
         case fileWriteFailed
         case invalidImportData
@@ -96,10 +96,10 @@ actor ExportImportService {
 
         var errorDescription: String? {
             switch self {
-            case .noConversations:
-                return "No conversations to export"
+            case .noDataToExport:
+                return "No data to export"
             case .encodingFailed:
-                return "Failed to encode conversation data"
+                return "Failed to encode data"
             case .fileWriteFailed:
                 return "Failed to write export file"
             case .invalidImportData:
@@ -134,7 +134,7 @@ actor ExportImportService {
     /// - Returns: URL of the exported file
     func exportConversations(_ conversations: [ConversationSD], format: ExportFormat) async throws -> URL {
         guard !conversations.isEmpty else {
-            throw ExportError.noConversations
+            throw ExportError.noDataToExport
         }
 
         switch format {
@@ -394,7 +394,7 @@ extension ExportImportService {
     /// - Returns: URL of the exported file
     func exportTemplates(_ templates: [CompletionInstructionSD]) async throws -> URL {
         guard !templates.isEmpty else {
-            throw ExportError.noConversations // Reusing error type
+            throw ExportError.noDataToExport
         }
 
         let exportableTemplates = templates.map { ExportablePromptTemplate(from: $0) }

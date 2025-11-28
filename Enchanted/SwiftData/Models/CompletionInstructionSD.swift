@@ -10,6 +10,7 @@ import SwiftData
 
 // MARK: - Prompt Category
 enum PromptCategory: String, Codable, CaseIterable, Identifiable {
+    case uncategorized = "Uncategorized"  // For legacy templates created before Feature 4
     case general = "General"
     case writing = "Writing"
     case coding = "Coding"
@@ -21,6 +22,7 @@ enum PromptCategory: String, Codable, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .uncategorized: return "questionmark.folder"
         case .general: return "square.grid.2x2"
         case .writing: return "pencil"
         case .coding: return "chevron.left.forwardslash.chevron.right"
@@ -28,6 +30,11 @@ enum PromptCategory: String, Codable, CaseIterable, Identifiable {
         case .creative: return "paintbrush"
         case .productivity: return "checkmark.circle"
         }
+    }
+
+    /// Categories available for user selection (excludes uncategorized)
+    static var selectableCategories: [PromptCategory] {
+        allCases.filter { $0 != .uncategorized }
     }
 }
 
@@ -51,8 +58,9 @@ final class CompletionInstructionSD: Identifiable {
 
     var category: PromptCategory {
         get {
-            guard let raw = categoryRaw else { return .general }
-            return PromptCategory(rawValue: raw) ?? .general
+            // Legacy templates (created before Feature 4) have nil categoryRaw
+            guard let raw = categoryRaw else { return .uncategorized }
+            return PromptCategory(rawValue: raw) ?? .uncategorized
         }
         set {
             categoryRaw = newValue.rawValue

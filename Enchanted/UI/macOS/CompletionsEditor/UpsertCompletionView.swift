@@ -77,9 +77,9 @@ struct UpsertCompletionView: View {
                 TextField("Name", text: $name)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
 
-                // Category picker
+                // Category picker (excludes "Uncategorized" which is only for legacy templates)
                 Picker("Category", selection: $category) {
-                    ForEach(PromptCategory.allCases) { cat in
+                    ForEach(PromptCategory.selectableCategories) { cat in
                         Label(cat.rawValue, systemImage: cat.icon)
                             .tag(cat)
                     }
