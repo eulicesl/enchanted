@@ -46,6 +46,14 @@ struct StartConversationIntent: AppIntent {
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult & ReturnsValue<ConversationEntity> & ProvidesDialog & OpensIntent {
+        // If there's an initial message, check server availability BEFORE creating the conversation
+        // to prevent orphan empty conversations when server is unreachable
+        if let initialMessage = initialMessage, !initialMessage.isEmpty {
+            guard await OllamaService.shared.reachable() else {
+                throw IntentError.serverUnreachable
+            }
+        }
+
         // Create the new conversation
         let conversation = ConversationSD(name: name)
 
@@ -64,25 +72,20 @@ struct StartConversationIntent: AppIntent {
         var responsePreview = "Created new conversation: \(name)"
 
         if let initialMessage = initialMessage, !initialMessage.isEmpty {
-            // Check server availability
-            if await OllamaService.shared.reachable() {
-                let askIntent = AskEnchantedIntent()
-                askIntent.prompt = initialMessage
-                askIntent.conversation = ConversationEntity(from: conversation)
-                askIntent.systemPrompt = systemPrompt
+            let askIntent = AskEnchantedIntent()
+            askIntent.prompt = initialMessage
+            askIntent.conversation = ConversationEntity(from: conversation)
+            askIntent.systemPrompt = systemPrompt
 
-                if let modelEntity = model {
-                    askIntent.model = modelEntity
-                }
+            if let modelEntity = model {
+                askIntent.model = modelEntity
+            }
 
-                do {
-                    let result = try await askIntent.perform()
-                    responsePreview = "Started conversation with response: \(result.value?.prefix(100) ?? "")..."
-                } catch {
-                    responsePreview = "Created conversation but couldn't send initial message: \(error.localizedDescription)"
-                }
-            } else {
-                responsePreview = "Created conversation '\(name)' but Ollama server is not reachable"
+            do {
+                let result = try await askIntent.perform()
+                responsePreview = "Started conversation with response: \(result.value?.prefix(100) ?? "")..."
+            } catch {
+                responsePreview = "Created conversation but couldn't send initial message: \(error.localizedDescription)"
             }
         }
 

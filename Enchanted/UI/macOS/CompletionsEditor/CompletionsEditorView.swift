@@ -120,9 +120,20 @@ struct CompletionsEditorView: View {
                     let savePanel = NSSavePanel()
                     savePanel.allowedContentTypes = [UTType.json]
                     savePanel.nameFieldStringValue = "enchanted_templates.json"
-                    savePanel.begin { response in
+                    savePanel.begin { [weak self] response in
                         if response == .OK, let destination = savePanel.url {
-                            try? FileManager.default.copyItem(at: url, to: destination)
+                            do {
+                                // Remove existing file if it exists (NSSavePanel confirms replacement)
+                                if FileManager.default.fileExists(atPath: destination.path) {
+                                    try FileManager.default.removeItem(at: destination)
+                                }
+                                try FileManager.default.copyItem(at: url, to: destination)
+                            } catch {
+                                DispatchQueue.main.async {
+                                    self?.importError = "Failed to export: \(error.localizedDescription)"
+                                    self?.showingImportError = true
+                                }
+                            }
                         }
                     }
                 }
@@ -143,9 +154,20 @@ struct CompletionsEditorView: View {
                     let savePanel = NSSavePanel()
                     savePanel.allowedContentTypes = [UTType.json]
                     savePanel.nameFieldStringValue = "\(completion.name).enchantedtemplate.json"
-                    savePanel.begin { response in
+                    savePanel.begin { [weak self] response in
                         if response == .OK, let destination = savePanel.url {
-                            try? FileManager.default.copyItem(at: url, to: destination)
+                            do {
+                                // Remove existing file if it exists (NSSavePanel confirms replacement)
+                                if FileManager.default.fileExists(atPath: destination.path) {
+                                    try FileManager.default.removeItem(at: destination)
+                                }
+                                try FileManager.default.copyItem(at: url, to: destination)
+                            } catch {
+                                DispatchQueue.main.async {
+                                    self?.importError = "Failed to export: \(error.localizedDescription)"
+                                    self?.showingImportError = true
+                                }
+                            }
                         }
                     }
                 }
@@ -250,7 +272,32 @@ struct CompletionsEditorView: View {
                     )
                 }
                 .onMove { source, destination in
-                    completions.move(fromOffsets: source, toOffset: destination)
+                    // When filtering is active, map filtered indices to original indices
+                    if filteredCompletions.count == completions.count {
+                        // No filtering active, direct move
+                        completions.move(fromOffsets: source, toOffset: destination)
+                    } else {
+                        // Filtering active - map indices from filtered to original array
+                        let sourceIndices = source.compactMap { filteredIndex -> Int? in
+                            guard filteredIndex < filteredCompletions.count else { return nil }
+                            let item = filteredCompletions[filteredIndex]
+                            return completions.firstIndex(where: { $0.id == item.id })
+                        }
+
+                        // Find destination index in original array
+                        let destIndex: Int
+                        if destination < filteredCompletions.count {
+                            let destItem = filteredCompletions[destination]
+                            destIndex = completions.firstIndex(where: { $0.id == destItem.id }) ?? completions.count
+                        } else if destination > 0, destination - 1 < filteredCompletions.count {
+                            let prevItem = filteredCompletions[destination - 1]
+                            destIndex = (completions.firstIndex(where: { $0.id == prevItem.id }) ?? completions.count - 1) + 1
+                        } else {
+                            destIndex = completions.count
+                        }
+
+                        completions.move(fromOffsets: IndexSet(sourceIndices), toOffset: destIndex)
+                    }
                     onSave()
                 }
             }

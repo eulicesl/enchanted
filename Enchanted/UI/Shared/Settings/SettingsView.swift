@@ -309,7 +309,7 @@ struct SettingsView: View {
                                     Text("• \"Start new Enchanted conversation\"")
                                         .font(.caption)
                                         .foregroundStyle(Color(.secondaryLabel))
-                                    Text("• \"What models does Enchanted have\"")
+                                    Text("• \"What models does Enchanted have?\"")
                                         .font(.caption)
                                         .foregroundStyle(Color(.secondaryLabel))
                                     Text("• \"Check Enchanted server status\"")

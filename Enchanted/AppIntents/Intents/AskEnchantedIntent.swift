@@ -48,6 +48,11 @@ struct AskEnchantedIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         // Check if server is reachable
         guard await OllamaService.shared.reachable() else {
             throw IntentError.serverUnreachable
@@ -59,17 +64,18 @@ struct AskEnchantedIntent: AppIntent {
         // Build message history
         var messageHistory = try await buildMessageHistory()
 
-        // Add system prompt if provided
-        if let systemPrompt = systemPrompt, !systemPrompt.isEmpty, messageHistory.isEmpty {
-            messageHistory.append(OKChatRequestData.Message(role: .system, content: systemPrompt))
+        // Add system prompt if provided and not already present in history
+        if let systemPrompt = systemPrompt, !systemPrompt.isEmpty,
+           !messageHistory.contains(where: { $0.role == .system }) {
+            messageHistory.insert(OKChatRequestData.Message(role: .system, content: systemPrompt), at: 0)
         }
 
         // Add user prompt
         messageHistory.append(OKChatRequestData.Message(role: .user, content: prompt))
 
-        // Create chat request
+        // Create chat request with reasonable default temperature (0.7 for varied responses)
         var request = OKChatRequestData(model: languageModel.name, messages: messageHistory)
-        request.options = OKCompletionOptions(temperature: 0)
+        request.options = OKCompletionOptions(temperature: 0.7)
 
         // Execute the request and collect response
         let response = try await executeChat(request: request)
@@ -136,7 +142,8 @@ struct AskEnchantedIntent: AppIntent {
 
     private func executeChat(request: OKChatRequestData) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
-            var fullResponse = ""
+            // Use actor-isolated storage to avoid race conditions
+            let responseCollector = ResponseCollector()
             var cancellable: AnyCancellable?
 
             cancellable = OllamaService.shared.ollamaKit.chat(data: request)
@@ -145,10 +152,11 @@ struct AskEnchantedIntent: AppIntent {
                         cancellable?.cancel()
                         switch completion {
                         case .finished:
-                            if fullResponse.isEmpty {
+                            let response = responseCollector.getResponse()
+                            if response.isEmpty {
                                 continuation.resume(throwing: IntentError.emptyResponse)
                             } else {
-                                continuation.resume(returning: fullResponse)
+                                continuation.resume(returning: response)
                             }
                         case .failure(let error):
                             continuation.resume(throwing: IntentError.chatFailed(error.localizedDescription))
@@ -156,14 +164,36 @@ struct AskEnchantedIntent: AppIntent {
                     },
                     receiveValue: { response in
                         if let content = response.message?.content {
-                            fullResponse += content
+                            responseCollector.append(content)
                         }
                     }
                 )
         }
     }
+}
 
-    private func saveToConversation(conversationId: UUID, userPrompt: String, assistantResponse: String, model: LanguageModelSD) async throws {
+// MARK: - Thread-safe response collector
+/// Collects response chunks in a thread-safe manner
+private final class ResponseCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var response = ""
+
+    func append(_ content: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        response += content
+    }
+
+    func getResponse() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return response
+    }
+}
+
+// MARK: - AskEnchantedIntent Extensions
+private extension AskEnchantedIntent {
+    func saveToConversation(conversationId: UUID, userPrompt: String, assistantResponse: String, model: LanguageModelSD) async throws {
         // This is a simplified save - in a full implementation you might want to
         // update the conversation through the ConversationStore
         guard let conversation = try await SwiftDataService.shared.getConversation(conversationId) else {
@@ -192,6 +222,7 @@ enum IntentError: Swift.Error, CustomLocalizedStringResourceConvertible {
     case emptyResponse
     case chatFailed(String)
     case conversationNotFound
+    case featureDisabled
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -205,6 +236,8 @@ enum IntentError: Swift.Error, CustomLocalizedStringResourceConvertible {
             return "Chat failed: \(message)"
         case .conversationNotFound:
             return "The specified conversation could not be found."
+        case .featureDisabled:
+            return "App Intents are disabled. Enable them in Settings > Siri & Shortcuts."
         }
     }
 }

@@ -10,6 +10,7 @@ import SwiftData
 import OllamaKit
 import Combine
 import SwiftUI
+import AppIntents
 
 @Observable
 final class ConversationStore: Sendable {
@@ -32,8 +33,40 @@ final class ConversationStore: Sendable {
     @MainActor var selectedConversation: ConversationSD?
     @MainActor var messages: [MessageSD] = []
     
+    private var notificationObserver: NSObjectProtocol?
+
     init(swiftDataService: SwiftDataService) {
         self.swiftDataService = swiftDataService
+        setupNotificationObserver()
+    }
+
+    private func setupNotificationObserver() {
+        // Listen for conversation selection from App Intents
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: .selectConversationFromIntent,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let conversationId = notification.userInfo?["conversationId"] as? UUID else {
+                return
+            }
+            Task {
+                await self.selectConversationById(conversationId)
+            }
+        }
+    }
+
+    /// Select a conversation by its UUID (used by App Intents)
+    @MainActor
+    func selectConversationById(_ conversationId: UUID) async {
+        do {
+            if let conversation = try await swiftDataService.getConversation(conversationId) {
+                try await selectConversation(conversation)
+            }
+        } catch {
+            print("Failed to select conversation from intent: \(error)")
+        }
     }
     
     func loadConversations() async throws {

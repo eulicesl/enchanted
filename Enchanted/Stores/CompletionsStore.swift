@@ -201,16 +201,26 @@ final class CompletionsStore {
     func addEnhancedSamples() {
         Task {
             let existingNames = Set(completions.map { $0.name })
-            let newSamples = CompletionInstructionSD.enhancedSamples.filter {
-                !existingNames.contains($0.name)
-            }
-
-            if !newSamples.isEmpty {
-                // Update order for new samples
-                for (index, sample) in newSamples.enumerated() {
-                    sample.order = completions.count + index
+            // Create copies of the samples to avoid mutating static data
+            let newSamples: [CompletionInstructionSD] = CompletionInstructionSD.enhancedSamples
+                .filter { !existingNames.contains($0.name) }
+                .enumerated()
+                .map { index, sample in
+                    // Create a new instance instead of mutating the static sample
+                    let copy = CompletionInstructionSD(
+                        name: sample.name,
+                        prompt: sample.prompt,
+                        order: completions.count + index,
+                        isEnabled: sample.isEnabled
+                    )
+                    // Copy enhanced library properties if available
+                    copy.category = sample.category
+                    copy.promptVariablesJSON = sample.promptVariablesJSON
+                    copy.isSystemTemplate = sample.isSystemTemplate
+                    return copy
                 }
 
+            if !newSamples.isEmpty {
                 try? await swiftDataService.updateCompletionInstructions(newSamples)
                 load()
             }
