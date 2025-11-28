@@ -17,7 +17,8 @@ struct CompletionsEditorView: View {
     @State var selectedCategory: PromptCategory? = nil
     @State var searchQuery: String = ""
     @State var isImporting: Bool = false
-    @State var importError: String? = nil
+    @State var showError: Bool = false
+    @State var errorMessage: String = ""
 
     var onSave: () -> ()
     var onDelete: (CompletionInstructionSD) -> ()
@@ -79,7 +80,8 @@ struct CompletionsEditorView: View {
                 }
             } catch {
                 await MainActor.run {
-                    importError = "Export failed: \(error.localizedDescription)"
+                    errorMessage = "Export failed: \(error.localizedDescription)"
+                    showError = true
                 }
             }
         }
@@ -98,15 +100,14 @@ struct CompletionsEditorView: View {
     private func importTemplates(from url: URL) {
         Task {
             do {
-                let count = try await ExportImportService.shared.importTemplatesFromJSON(url: url)
+                _ = try await ExportImportService.shared.importTemplatesFromJSON(url: url)
                 await MainActor.run {
-                    // Reload completions
                     CompletionsStore.shared.load()
-                    importError = nil
                 }
             } catch {
                 await MainActor.run {
-                    importError = "Import failed: \(error.localizedDescription)"
+                    errorMessage = "Import failed: \(error.localizedDescription)"
+                    showError = true
                 }
             }
         }
@@ -149,13 +150,14 @@ struct CompletionsEditorView: View {
                     importTemplates(from: url)
                 }
             case .failure(let error):
-                importError = "Failed to select file: \(error.localizedDescription)"
+                errorMessage = "Failed to select file: \(error.localizedDescription)"
+                showError = true
             }
         }
-        .alert("Error", isPresented: .constant(importError != nil)) {
-            Button("OK") { importError = nil }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
         } message: {
-            Text(importError ?? "")
+            Text(errorMessage)
         }
     }
 
