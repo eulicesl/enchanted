@@ -12,9 +12,13 @@ struct SidebarView: View {
     @Environment(\.openWindow) var openWindow
     var selectedConversation: ConversationSD?
     var conversations: [ConversationSD]
+    var archivedConversations: [ConversationSD]
     var onConversationTap: (_ conversation: ConversationSD) -> ()
     var onConversationDelete: (_ conversation: ConversationSD) -> ()
     var onDeleteDailyConversations: (_ date: Date) -> ()
+    var onTogglePin: ((_ conversation: ConversationSD) -> ())?
+    var onArchive: ((_ conversation: ConversationSD) -> ())?
+    var onUnarchive: ((_ conversation: ConversationSD) -> ())?
 
     @State var showSettings = false
     @State var showCompletions = false
@@ -33,6 +37,7 @@ struct SidebarView: View {
     @State private var showFolderPicker = false
     @State private var organizationError: String?
     @State private var showOrganizationSection = true
+    @State private var showArchivedSection = false
 
     // Feature flags
     @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
@@ -240,8 +245,45 @@ struct SidebarView: View {
                     onDeleteDailyConversations: onDeleteDailyConversations,
                     onExport: enableExportImport ? onExportConversation : nil,
                     onManageTags: enableOrganization ? onManageTags : nil,
-                    onMoveToFolder: enableOrganization ? onMoveToFolder : nil
+                    onMoveToFolder: enableOrganization ? onMoveToFolder : nil,
+                    onTogglePin: onTogglePin,
+                    onArchive: onArchive,
+                    isArchiveView: false
                 )
+
+                // Archived section
+                if !archivedConversations.isEmpty {
+                    Divider()
+                        .padding(.vertical, 8)
+
+                    DisclosureGroup(isExpanded: $showArchivedSection) {
+                        ConversationHistoryList(
+                            selectedConversation: selectedConversation,
+                            conversations: archivedConversations,
+                            onTap: onConversationTap,
+                            onDelete: onConversationDelete,
+                            onDeleteDailyConversations: onDeleteDailyConversations,
+                            onExport: enableExportImport ? onExportConversation : nil,
+                            onManageTags: enableOrganization ? onManageTags : nil,
+                            onMoveToFolder: enableOrganization ? onMoveToFolder : nil,
+                            onUnarchive: onUnarchive,
+                            isArchiveView: true
+                        )
+                    } label: {
+                        HStack {
+                            Image(systemName: "archivebox.fill")
+                                .foregroundStyle(.secondary)
+                            Text("Archived")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("(\(archivedConversations.count))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
             }
             .scrollIndicators(.never)
 
@@ -463,5 +505,12 @@ struct FolderPickerRow: View {
 }
 
 #Preview {
-    SidebarView(selectedConversation: ConversationSD.sample[0], conversations: ConversationSD.sample, onConversationTap: {_ in}, onConversationDelete: {_ in}, onDeleteDailyConversations: {_ in})
+    SidebarView(
+        selectedConversation: ConversationSD.sample[0],
+        conversations: ConversationSD.sample,
+        archivedConversations: [],
+        onConversationTap: {_ in},
+        onConversationDelete: {_ in},
+        onDeleteDailyConversations: {_ in}
+    )
 }

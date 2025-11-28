@@ -30,6 +30,10 @@ struct ConversationHistoryList: View {
     var onExport: ((_ conversation: ConversationSD) -> ())? = nil
     var onManageTags: ((_ conversation: ConversationSD) -> ())? = nil
     var onMoveToFolder: ((_ conversation: ConversationSD) -> ())? = nil
+    var onTogglePin: ((_ conversation: ConversationSD) -> ())? = nil
+    var onArchive: ((_ conversation: ConversationSD) -> ())? = nil
+    var onUnarchive: ((_ conversation: ConversationSD) -> ())? = nil
+    var isArchiveView: Bool = false
     
     func groupConversationsByDay(conversations: [ConversationSD]) -> [ConversationGroup] {
         let groupedDictionary = Dictionary(grouping: conversations) { (conversation) -> Date in
@@ -71,7 +75,13 @@ struct ConversationHistoryList: View {
                                 .animation(.easeOut(duration: 0.15))
                                 .transition(.opacity)
                                 .showIf(selectedConversation == dailyConversation)
-                            
+
+                            if dailyConversation.isPinned {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.orange)
+                            }
+
                             Text(dailyConversation.name)
                                 .lineLimit(1)
                                 .font(.system(size: 16))
@@ -84,6 +94,16 @@ struct ConversationHistoryList: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu(menuItems: {
+                        // Pin/Unpin
+                        if let onTogglePin = onTogglePin, !isArchiveView {
+                            Button(action: { onTogglePin(dailyConversation) }) {
+                                Label(
+                                    dailyConversation.isPinned ? "Unpin" : "Pin",
+                                    systemImage: dailyConversation.isPinned ? "pin.slash.fill" : "pin.fill"
+                                )
+                            }
+                        }
+
                         if let onManageTags = onManageTags {
                             Button(action: { onManageTags(dailyConversation) }) {
                                 Label("Manage Tags", systemImage: "tag.fill")
@@ -96,7 +116,7 @@ struct ConversationHistoryList: View {
                             }
                         }
 
-                        if onManageTags != nil || onMoveToFolder != nil {
+                        if onManageTags != nil || onMoveToFolder != nil || onTogglePin != nil {
                             Divider()
                         }
 
@@ -104,8 +124,24 @@ struct ConversationHistoryList: View {
                             Button(action: { onExport(dailyConversation) }) {
                                 Label("Export Conversation", systemImage: "square.and.arrow.up")
                             }
-                            Divider()
                         }
+
+                        // Archive/Unarchive
+                        if isArchiveView {
+                            if let onUnarchive = onUnarchive {
+                                Button(action: { onUnarchive(dailyConversation) }) {
+                                    Label("Unarchive", systemImage: "tray.and.arrow.up.fill")
+                                }
+                            }
+                        } else {
+                            if let onArchive = onArchive {
+                                Button(action: { onArchive(dailyConversation) }) {
+                                    Label("Archive", systemImage: "archivebox.fill")
+                                }
+                            }
+                        }
+
+                        Divider()
 
                         Button(role: .destructive, action: { onDelete(dailyConversation) }) {
                             Label("Delete", systemImage: "trash")

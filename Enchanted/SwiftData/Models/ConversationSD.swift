@@ -32,12 +32,20 @@ final class ConversationSD: Identifiable {
     @Relationship(deleteRule: .nullify)
     var folder: ConversationFolderSD?
 
+    // MARK: - ChatGPT Parity Features
+    var isArchived: Bool = false
+    var isPinned: Bool = false
+    var pinnedAt: Date?  // For sorting pinned items by pin time
+
     init(name: String, updatedAt: Date = Date.now) {
         self.name = name
         self.updatedAt = updatedAt
         self.createdAt = updatedAt
         self.tags = []
         self.folder = nil
+        self.isArchived = false
+        self.isPinned = false
+        self.pinnedAt = nil
     }
 }
 

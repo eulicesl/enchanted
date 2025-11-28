@@ -77,6 +77,27 @@ struct Chat: View, Sendable {
             try? await conversationStore.delete(conversation)
         }
     }
+
+    func onTogglePin(_ conversation: ConversationSD) {
+        Task {
+            await Haptics.shared.mediumTap()
+            try? await conversationStore.togglePin(conversation)
+        }
+    }
+
+    func onArchive(_ conversation: ConversationSD) {
+        Task {
+            await Haptics.shared.mediumTap()
+            try? await conversationStore.archiveConversation(conversation)
+        }
+    }
+
+    func onUnarchive(_ conversation: ConversationSD) {
+        Task {
+            await Haptics.shared.mediumTap()
+            try? await conversationStore.unarchiveConversation(conversation)
+        }
+    }
     
     func newConversation() {
         DispatchQueue.main.async {
@@ -129,7 +150,8 @@ struct Chat: View, Sendable {
 #if os(macOS) || os(visionOS)
             ChatView(
                 selectedConversation: conversationStore.selectedConversation,
-                conversations: conversationStore.conversations,
+                conversations: conversationStore.activeConversations,
+                archivedConversations: conversationStore.archivedConversations,
                 messages: conversationStore.messages,
                 modelsList: languageModelStore.models,
                 onMenuTap: toggleMenu,
@@ -145,7 +167,10 @@ struct Chat: View, Sendable {
                 onConversationDelete: onConversationDelete,
                 onDeleteDailyConversations: conversationStore.deleteDailyConversations,
                 userInitials: userInitials,
-                copyChat: copyChat
+                copyChat: copyChat,
+                onTogglePin: onTogglePin,
+                onArchive: onArchive,
+                onUnarchive: onUnarchive
             )
             .toolbar {
                 if enableModelComparison {
@@ -160,10 +185,14 @@ struct Chat: View, Sendable {
             SideBarStack(sidebarWidth: 300,showSidebar: $showMenu, sidebar: {
                 SidebarView(
                     selectedConversation: conversationStore.selectedConversation,
-                    conversations: conversationStore.conversations,
+                    conversations: conversationStore.activeConversations,
+                    archivedConversations: conversationStore.archivedConversations,
                     onConversationTap: onConversationTap,
                     onConversationDelete: onConversationDelete,
-                    onDeleteDailyConversations: conversationStore.deleteDailyConversations
+                    onDeleteDailyConversations: conversationStore.deleteDailyConversations,
+                    onTogglePin: onTogglePin,
+                    onArchive: onArchive,
+                    onUnarchive: onUnarchive
                 )
             }) {
                 ChatView(

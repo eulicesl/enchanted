@@ -12,6 +12,7 @@ struct ChatView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.doubleColumn
     var selectedConversation: ConversationSD?
     var conversations: [ConversationSD]
+    var archivedConversations: [ConversationSD] = []
     var messages: [MessageSD]
     var modelsList: [LanguageModelSD]
     var onMenuTap: () -> ()
@@ -28,6 +29,9 @@ struct ChatView: View {
     var onDeleteDailyConversations: (_ date: Date) -> ()
     var userInitials: String
     var copyChat: (_ json: Bool) -> ()
+    var onTogglePin: ((_ conversation: ConversationSD) -> ())? = nil
+    var onArchive: ((_ conversation: ConversationSD) -> ())? = nil
+    var onUnarchive: ((_ conversation: ConversationSD) -> ())? = nil
     
     @State private var message = ""
     @State private var editMessage: MessageSD?
@@ -39,9 +43,13 @@ struct ChatView: View {
             SidebarView(
                 selectedConversation: selectedConversation,
                 conversations: conversations,
+                archivedConversations: archivedConversations,
                 onConversationTap: onConversationTap,
                 onConversationDelete: onConversationDelete,
-                onDeleteDailyConversations: onDeleteDailyConversations
+                onDeleteDailyConversations: onDeleteDailyConversations,
+                onTogglePin: onTogglePin,
+                onArchive: onArchive,
+                onUnarchive: onUnarchive
             )
             .toolbar {
 #if os(visionOS)

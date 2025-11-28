@@ -31,7 +31,32 @@ final class ConversationStore: Sendable {
     @MainActor var conversations: [ConversationSD] = []
     @MainActor var selectedConversation: ConversationSD?
     @MainActor var messages: [MessageSD] = []
-    
+    @MainActor var showArchived: Bool = false
+
+    /// Active (non-archived) conversations, with pinned items first
+    @MainActor var activeConversations: [ConversationSD] {
+        conversations
+            .filter { !$0.isArchived }
+            .sorted { first, second in
+                // Pinned items first, then by update date
+                if first.isPinned != second.isPinned {
+                    return first.isPinned
+                }
+                // Among pinned, sort by pinnedAt; among unpinned, sort by updatedAt
+                if first.isPinned {
+                    return (first.pinnedAt ?? .distantPast) > (second.pinnedAt ?? .distantPast)
+                }
+                return first.updatedAt > second.updatedAt
+            }
+    }
+
+    /// Archived conversations
+    @MainActor var archivedConversations: [ConversationSD] {
+        conversations
+            .filter { $0.isArchived }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
     init(swiftDataService: SwiftDataService) {
         self.swiftDataService = swiftDataService
     }
@@ -231,5 +256,50 @@ final class ConversationStore: Sendable {
         withAnimation {
             conversationState = .completed
         }
+    }
+
+    // MARK: - Archive & Pin (ChatGPT Parity)
+
+    func archiveConversation(_ conversation: ConversationSD) async throws {
+        conversation.isArchived = true
+        try await swiftDataService.updateConversation(conversation)
+
+        // Deselect if currently selected
+        await MainActor.run {
+            if selectedConversation?.id == conversation.id {
+                selectedConversation = nil
+                messages = []
+            }
+        }
+        try await loadConversations()
+    }
+
+    func unarchiveConversation(_ conversation: ConversationSD) async throws {
+        conversation.isArchived = false
+        try await swiftDataService.updateConversation(conversation)
+        try await loadConversations()
+    }
+
+    func togglePin(_ conversation: ConversationSD) async throws {
+        conversation.isPinned.toggle()
+        conversation.pinnedAt = conversation.isPinned ? Date() : nil
+        try await swiftDataService.updateConversation(conversation)
+        try await loadConversations()
+    }
+
+    func pinConversation(_ conversation: ConversationSD) async throws {
+        guard !conversation.isPinned else { return }
+        conversation.isPinned = true
+        conversation.pinnedAt = Date()
+        try await swiftDataService.updateConversation(conversation)
+        try await loadConversations()
+    }
+
+    func unpinConversation(_ conversation: ConversationSD) async throws {
+        guard conversation.isPinned else { return }
+        conversation.isPinned = false
+        conversation.pinnedAt = nil
+        try await swiftDataService.updateConversation(conversation)
+        try await loadConversations()
     }
 }

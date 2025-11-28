@@ -28,6 +28,7 @@ final class ConversationFolderSD: Identifiable {
     var createdAt: Date
     var order: Int
     var isExpanded: Bool // For UI state persistence
+    var customInstructions: String? // Per-folder system prompt override (ChatGPT parity)
 
     @Relationship(deleteRule: .nullify)
     var parentFolder: ConversationFolderSD?
@@ -43,7 +44,8 @@ final class ConversationFolderSD: Identifiable {
         icon: String? = "folder.fill",
         parentFolder: ConversationFolderSD? = nil,
         order: Int = 0,
-        isExpanded: Bool = true
+        isExpanded: Bool = true,
+        customInstructions: String? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -51,6 +53,7 @@ final class ConversationFolderSD: Identifiable {
         self.createdAt = Date()
         self.order = order
         self.isExpanded = isExpanded
+        self.customInstructions = customInstructions
         self.parentFolder = parentFolder
         self.subfolders = []
         self.conversations = []
