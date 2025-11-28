@@ -26,6 +26,7 @@ struct Settings: View {
     @AppStorage("feature.exportImport") private var enableExportImport: Bool = false
     @AppStorage("feature.conversationOrganization") private var enableConversationOrganization: Bool = false
     @AppStorage("feature.modelComparison") private var enableModelComparison: Bool = false
+    @AppStorage("feature.appIntents") private var enableAppIntents: Bool = false
 
     @StateObject private var speechSynthesiser = SpeechSynthesizer.shared
 
@@ -171,6 +172,7 @@ struct Settings: View {
             enableExportImport: $enableExportImport,
             enableConversationOrganization: $enableConversationOrganization,
             enableModelComparison: $enableModelComparison,
+            enableAppIntents: $enableAppIntents,
             save: save,
             checkServer: checkServer,
             deleteAll: deleteAll,

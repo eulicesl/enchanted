@@ -22,6 +22,7 @@ struct SettingsView: View {
     @Binding var enableExportImport: Bool
     @Binding var enableConversationOrganization: Bool
     @Binding var enableModelComparison: Bool
+    @Binding var enableAppIntents: Bool
     @State var ollamaStatus: Bool?
     var save: () -> ()
     var checkServer: () -> ()
@@ -32,7 +33,15 @@ struct SettingsView: View {
     var voices: [AVSpeechSynthesisVoice]
 
     @State private var deleteConversationsDialog = false
-    
+
+    #if os(iOS)
+    private func openShortcutsApp() {
+        if let url = URL(string: "shortcuts://") {
+            UIApplication.shared.open(url)
+        }
+    }
+    #endif
+
     var body: some View {
         VStack {
             ZStack {
@@ -243,6 +252,52 @@ struct SettingsView: View {
                         }
                     }
 
+                    Section(header: Text("SIRI & SHORTCUTS").font(.headline).padding(.top, 20)) {
+                        Toggle(isOn: $enableAppIntents) {
+                            Label("Enable App Intents", systemImage: "mic.badge.plus")
+                                .foregroundStyle(Color.label)
+                        }
+
+                        if enableAppIntents {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Use Siri and Shortcuts to interact with Enchanted. Say \"Ask Enchanted about...\" or create automations in the Shortcuts app.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Available commands:")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    Text("• \"Ask Enchanted [question]\"")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• \"Start new Enchanted conversation\"")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• \"What models does Enchanted have\"")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• \"Check Enchanted server status\"")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                }
+                                .padding(.top, 4)
+
+                                #if os(iOS)
+                                Button(action: openShortcutsApp) {
+                                    HStack {
+                                        Spacer()
+                                        Label("Open Shortcuts App", systemImage: "square.on.square")
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.bordered)
+                                #endif
+                            }
+                        }
+                    }
+
                     Button(action: {deleteConversationsDialog.toggle()}) {
                         HStack {
                             Spacer()
@@ -281,6 +336,8 @@ struct SettingsView: View {
         voiceIdentifier: .constant("sample"),
         enableExportImport: .constant(true),
         enableConversationOrganization: .constant(true),
+        enableModelComparison: .constant(true),
+        enableAppIntents: .constant(true),
         save: {},
         checkServer: {},
         deleteAll: {},
