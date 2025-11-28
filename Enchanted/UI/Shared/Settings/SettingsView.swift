@@ -23,6 +23,7 @@ struct SettingsView: View {
     @Binding var enableConversationOrganization: Bool
     @Binding var enableModelComparison: Bool
     @Binding var enableAppIntents: Bool
+    @Binding var enableEnhancedPromptLibrary: Bool
     @State var ollamaStatus: Bool?
     var save: () -> ()
     var checkServer: () -> ()
@@ -217,6 +218,40 @@ struct SettingsView: View {
                         }
                     }
 
+                    Section(header: Text("PROMPT LIBRARY").font(.headline).padding(.top, 20)) {
+                        Toggle(isOn: $enableEnhancedPromptLibrary) {
+                            Label("Enhanced Prompt Library", systemImage: "text.badge.plus")
+                                .foregroundStyle(Color.label)
+                        }
+
+                        if enableEnhancedPromptLibrary {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Create advanced prompt templates with variables, categories, and import/export support.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color(.secondaryLabel))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Features:")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    Text("• Use {{VARIABLE}} syntax in templates")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• Organize templates by category")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• Import/export templates as JSON")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                    Text("• Search and filter templates")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                }
+                                .padding(.top, 4)
+                            }
+                        }
+                    }
+
                     Section(header: Text("BACKUP & EXPORT").font(.headline).padding(.top, 20)) {
                         Toggle(isOn: $enableExportImport) {
                             Label("Enable Export/Import", systemImage: "arrow.up.arrow.down.circle")
@@ -338,6 +373,7 @@ struct SettingsView: View {
         enableConversationOrganization: .constant(true),
         enableModelComparison: .constant(true),
         enableAppIntents: .constant(true),
+        enableEnhancedPromptLibrary: .constant(true),
         save: {},
         checkServer: {},
         deleteAll: {},
