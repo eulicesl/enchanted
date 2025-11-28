@@ -252,8 +252,21 @@ struct CompletionsEditorView: View {
         .padding(.bottom, 10)
     }
 
+    /// Whether reordering is currently allowed (only when no filters active)
+    private var canReorder: Bool {
+        selectedCategory == nil && searchQuery.isEmpty
+    }
+
     private var completionsList: some View {
         List {
+            // Show hint when reordering is disabled
+            if !canReorder && !filteredCompletions.isEmpty {
+                Text("Clear filters to reorder templates")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .listRowBackground(Color.clear)
+            }
+
             ForEach(filteredCompletions.indices, id: \.self) { index in
                 let completion = filteredCompletions[index]
                 HStack(alignment: .center) {
@@ -305,16 +318,10 @@ struct CompletionsEditorView: View {
                     .opacity(completion.isBuiltIn ? 0.5 : 1)
                 }
             }
-            .onMove { source, destination in
-                // Find actual indices in completions array
-                let sourceItems = source.map { filteredCompletions[$0] }
-                for item in sourceItems {
-                    if let fromIndex = completions.firstIndex(where: { $0.id == item.id }) {
-                        completions.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: destination)
-                    }
-                }
+            .onMove(perform: canReorder ? { source, destination in
+                completions.move(fromOffsets: source, toOffset: destination)
                 onSave()
-            }
+            } : nil)
         }
         .listStyle(PlainListStyle())
     }
