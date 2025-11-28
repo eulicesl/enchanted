@@ -27,6 +27,9 @@ struct ConversationHistoryList: View {
     var onTap: (_ conversation: ConversationSD) -> ()
     var onDelete: (_ conversation: ConversationSD) -> ()
     var onDeleteDailyConversations: (_ date: Date) -> ()
+    var onExport: ((_ conversation: ConversationSD) -> ())? = nil
+    var onManageTags: ((_ conversation: ConversationSD) -> ())? = nil
+    var onMoveToFolder: ((_ conversation: ConversationSD) -> ())? = nil
     
     func groupConversationsByDay(conversations: [ConversationSD]) -> [ConversationGroup] {
         let groupedDictionary = Dictionary(grouping: conversations) { (conversation) -> Date in
@@ -81,6 +84,29 @@ struct ConversationHistoryList: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu(menuItems: {
+                        if let onManageTags = onManageTags {
+                            Button(action: { onManageTags(dailyConversation) }) {
+                                Label("Manage Tags", systemImage: "tag.fill")
+                            }
+                        }
+
+                        if let onMoveToFolder = onMoveToFolder {
+                            Button(action: { onMoveToFolder(dailyConversation) }) {
+                                Label("Move to Folder", systemImage: "folder.fill")
+                            }
+                        }
+
+                        if onManageTags != nil || onMoveToFolder != nil {
+                            Divider()
+                        }
+
+                        if let onExport = onExport {
+                            Button(action: { onExport(dailyConversation) }) {
+                                Label("Export Conversation", systemImage: "square.and.arrow.up")
+                            }
+                            Divider()
+                        }
+
                         Button(role: .destructive, action: { onDelete(dailyConversation) }) {
                             Label("Delete", systemImage: "trash")
                         }
