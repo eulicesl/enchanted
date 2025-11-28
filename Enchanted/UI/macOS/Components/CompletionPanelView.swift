@@ -30,27 +30,50 @@ struct PanelCompletionsView: View {
     var completionInApp: @MainActor (_ completion: CompletionInstructionSD) -> ()
     @State var completionMode: CompletionsPromptMode = .completionsInApp
     @State var selectedCompletion: CompletionInstructionSD? = nil
-    
+
     @State var customCompletionInstruction: String = ""
     @State var showCustomCompletionInstructionTextField = false
     @FocusState var focusCustomCompletionsTectField: Bool
     @Namespace var animation
-    
+
+    // Variable substitution state (Feature 4)
+    @State var showVariableSubstitution: Bool = false
+    @State var pendingCompletion: CompletionInstructionSD? = nil
+    @State var variableValues: [String: String] = [:]
+
     var filetedCompletions: [CompletionInstructionSD] {
         if let selectedCompletion = selectedCompletion {
             return [selectedCompletion]
         }
         return completions
     }
-    
+
     func changeCompletionMode() {
         withAnimation {
             completionMode = completionMode.next
         }
     }
-    
+
     @MainActor
     func submitCompletion(_ completion: CompletionInstructionSD) {
+        // Check if the template has variables (excluding {{text}} which is auto-filled)
+        let userVariables = completion.extractedVariables.filter { $0.lowercased() != "text" }
+
+        if !userVariables.isEmpty {
+            // Show variable substitution UI
+            pendingCompletion = completion
+            variableValues = Dictionary(uniqueKeysWithValues: userVariables.map { ($0, "") })
+            withAnimation {
+                showVariableSubstitution = true
+            }
+        } else {
+            // No variables, proceed directly
+            executeCompletion(completion)
+        }
+    }
+
+    @MainActor
+    func executeCompletion(_ completion: CompletionInstructionSD) {
         withAnimation {
             selectedCompletion = completion
             switch completionMode {
@@ -59,6 +82,42 @@ struct PanelCompletionsView: View {
             case .completionsInApp:
                 completionInApp(completion)
             }
+        }
+    }
+
+    @MainActor
+    func submitWithVariables() {
+        guard let completion = pendingCompletion else { return }
+
+        // Create a modified completion with substituted variables
+        let substitutedInstruction = PromptVariableParser.substituteVariables(
+            in: completion.instruction,
+            with: variableValues
+        )
+
+        let modifiedCompletion = CompletionInstructionSD(
+            name: completion.name,
+            keyboardCharacterStr: completion.keyboardCharacterStr,
+            instruction: substitutedInstruction,
+            order: completion.order,
+            modelTemperature: completion.modelTemperature ?? 0.8,
+            category: completion.category,
+            author: completion.author,
+            isBuiltIn: completion.isBuiltIn
+        )
+
+        showVariableSubstitution = false
+        pendingCompletion = nil
+        variableValues = [:]
+
+        executeCompletion(modifiedCompletion)
+    }
+
+    func cancelVariableSubstitution() {
+        withAnimation {
+            showVariableSubstitution = false
+            pendingCompletion = nil
+            variableValues = [:]
         }
     }
     
@@ -140,14 +199,14 @@ struct PanelCompletionsView: View {
                     .scaledToFit()
                     .frame(width: 20)
                     .foregroundColor(.label)
-                
+
                 Text("Completions")
                     .font(.title2)
                     .fontWeight(.light)
                     .enchantify()
-                
+
                 Spacer()
-                
+
                 HStack(alignment: .firstTextBaseline) {
                     Text("Tap")
                     Image(systemName: "space")
@@ -155,64 +214,85 @@ struct PanelCompletionsView: View {
                 }
                 .showIf(selectedCompletion != nil)
             }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                WrappingHStack(alignment: .leading) {
-                    ForEach(filetedCompletions) { completion in
-                        CompletionButtonView(
-                            name: completion.name,
-                            keyboardCharacter: completion.keyboardCharacter,
-                            action: {
-                                submitCompletion(completion)
+
+            // Variable Substitution View (Feature 4)
+            if showVariableSubstitution, let completion = pendingCompletion {
+                VariableSubstitutionView(
+                    templateName: completion.name,
+                    variables: completion.extractedVariables.filter { $0.lowercased() != "text" },
+                    values: $variableValues,
+                    onSubmit: submitWithVariables,
+                    onCancel: cancelVariableSubstitution
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    WrappingHStack(alignment: .leading) {
+                        ForEach(filetedCompletions) { completion in
+                            CompletionButtonView(
+                                name: completion.name,
+                                keyboardCharacter: completion.keyboardCharacter,
+                                action: {
+                                    submitCompletion(completion)
+                                }
+                            )
+                            .keyboardShortcut(KeyEquivalent(completion.keyboardCharacter), modifiers: [])
+                            .overlay(alignment: .topTrailing) {
+                                // Variable indicator badge
+                                if completion.hasVariables {
+                                    Image(systemName: "curlybraces")
+                                        .font(.system(size: 8))
+                                        .foregroundColor(.white)
+                                        .padding(3)
+                                        .background(Circle().fill(Color.blue))
+                                        .offset(x: 4, y: -4)
+                                }
                             }
-                        )
-                        .keyboardShortcut(KeyEquivalent(completion.keyboardCharacter), modifiers: [])
+                        }
+
+                        customCompletionButton
+                            .showIf(!showCustomCompletionInstructionTextField)
                     }
-                    
-                    customCompletionButton
-                        .showIf(!showCustomCompletionInstructionTextField)
-                }
-                
-                if showCustomCompletionInstructionTextField {
-                    customCompletionInstructionTextField
-                }
-            }
-            .padding(.bottom, 10)
-            
-            HStack(alignment: .center) {
-                switch completionMode {
-                case .completionsInApp:
-                    Text("Respond in **App**.")
-                case .completionsInCurrentWindow:
-                    Text("Respond in current **Window**.")
-                }
-                
-                Button(action: changeCompletionMode) {
-                    HStack(spacing: 4) {
-                        Text("⇧")
-                            .font(.caption2)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(.bgCustom))
-                        
-                        Text("+")
-                            .font(.footnote)
-                        
-                        Text("SPACE")
-                            .font(.caption2)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(.bgCustom))
+
+                    if showCustomCompletionInstructionTextField {
+                        customCompletionInstructionTextField
                     }
-                        
                 }
-                .buttonStyle(GrowingButton())
-                
-                Text("to switch")
+                .padding(.bottom, 10)
+
+                HStack(alignment: .center) {
+                    switch completionMode {
+                    case .completionsInApp:
+                        Text("Respond in **App**.")
+                    case .completionsInCurrentWindow:
+                        Text("Respond in current **Window**.")
+                    }
+
+                    Button(action: changeCompletionMode) {
+                        HStack(spacing: 4) {
+                            Text("⇧")
+                                .font(.caption2)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(RoundedRectangle(cornerRadius: 3).fill(.bgCustom))
+
+                            Text("+")
+                                .font(.footnote)
+
+                            Text("SPACE")
+                                .font(.caption2)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(RoundedRectangle(cornerRadius: 3).fill(.bgCustom))
+                        }
+                    }
+                    .buttonStyle(GrowingButton())
+
+                    Text("to switch")
+                }
+                .padding(.horizontal, 8)
+                .showIf(selectedCompletion == nil)
             }
-            
-            .padding(.horizontal, 8)
-            .showIf(selectedCompletion == nil)
         }
         .padding()
         .background {

@@ -350,6 +350,159 @@ actor ExportImportService {
     }
 }
 
+// MARK: - Prompt Template Export/Import (Feature 4)
+
+/// Codable version of CompletionInstructionSD for export/import
+struct ExportablePromptTemplate: Codable, Identifiable {
+    let id: UUID
+    let name: String
+    let keyboardCharacter: String
+    let instruction: String
+    let temperature: Float?
+    let category: String
+    let author: String?
+    let isBuiltIn: Bool
+
+    init(from template: CompletionInstructionSD) {
+        self.id = template.id
+        self.name = template.name
+        self.keyboardCharacter = template.keyboardCharacterStr
+        self.instruction = template.instruction
+        self.temperature = template.modelTemperature
+        self.category = template.category.rawValue
+        self.author = template.author
+        self.isBuiltIn = template.isBuiltIn
+    }
+}
+
+/// Export file format for prompt templates
+struct EnchantedTemplateExport: Codable {
+    let version: String
+    let exportDate: Date
+    let appVersion: String?
+    let templates: [ExportablePromptTemplate]
+
+    static let currentVersion = "1.0"
+}
+
+extension ExportImportService {
+
+    // MARK: - Template Export Methods
+
+    /// Export prompt templates to JSON format
+    /// - Parameter templates: Array of templates to export
+    /// - Returns: URL of the exported file
+    func exportTemplates(_ templates: [CompletionInstructionSD]) async throws -> URL {
+        guard !templates.isEmpty else {
+            throw ExportError.noConversations // Reusing error type
+        }
+
+        let exportableTemplates = templates.map { ExportablePromptTemplate(from: $0) }
+
+        let export = EnchantedTemplateExport(
+            version: EnchantedTemplateExport.currentVersion,
+            exportDate: Date(),
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+            templates: exportableTemplates
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        guard let jsonData = try? encoder.encode(export) else {
+            throw ExportError.encodingFailed
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let dateString = dateFormatter.string(from: Date())
+        let fileName = "enchanted-templates-\(dateString).json"
+
+        return try await writeToTemporaryFile(data: jsonData, fileName: fileName)
+    }
+
+    /// Export all templates from the database
+    /// - Returns: URL of the exported file
+    func exportAllTemplates() async throws -> URL {
+        let templates = try await swiftDataService.fetchCompletionInstructions()
+        return try await exportTemplates(templates)
+    }
+
+    // MARK: - Template Import Methods
+
+    /// Import templates from a JSON file
+    /// - Parameters:
+    ///   - url: URL of the JSON file to import
+    ///   - mergeStrategy: How to handle duplicate templates
+    /// - Returns: Number of templates imported
+    @discardableResult
+    func importTemplatesFromJSON(url: URL, mergeStrategy: MergeStrategy = .createNew) async throws -> Int {
+        guard url.startAccessingSecurityScopedResource() else {
+            throw ExportError.invalidImportData
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let export = try decoder.decode(EnchantedTemplateExport.self, from: data)
+
+        // Validate version
+        guard export.version == EnchantedTemplateExport.currentVersion else {
+            throw ExportError.unsupportedVersion(export.version)
+        }
+
+        // Get existing templates for merge checking
+        let existingTemplates = try await swiftDataService.fetchCompletionInstructions()
+        let existingIds = Set(existingTemplates.map { $0.id })
+        let maxOrder = existingTemplates.map { $0.order }.max() ?? 0
+
+        var importedCount = 0
+        var currentOrder = maxOrder + 1
+
+        for exportableTemplate in export.templates {
+            let shouldImport: Bool
+
+            switch mergeStrategy {
+            case .skipExisting:
+                shouldImport = !existingIds.contains(exportableTemplate.id)
+            case .deleteAndCreateNew:
+                // Delete existing if found
+                if let existing = existingTemplates.first(where: { $0.id == exportableTemplate.id }) {
+                    try await swiftDataService.deleteCompletionInstruction(existing)
+                }
+                shouldImport = true
+            case .createNew:
+                shouldImport = true
+            }
+
+            if shouldImport {
+                let category = PromptCategory(rawValue: exportableTemplate.category) ?? .general
+
+                let template = CompletionInstructionSD(
+                    name: exportableTemplate.name,
+                    keyboardCharacterStr: exportableTemplate.keyboardCharacter,
+                    instruction: exportableTemplate.instruction,
+                    order: currentOrder,
+                    modelTemperature: exportableTemplate.temperature ?? 0.8,
+                    category: category,
+                    author: exportableTemplate.author,
+                    isBuiltIn: false // Imported templates are never built-in
+                )
+
+                // For createNew strategy, use new UUID (default behavior)
+                try await swiftDataService.updateCompletionInstructions([template])
+                importedCount += 1
+                currentOrder += 1
+            }
+        }
+
+        return importedCount
+    }
+}
+
 // MARK: - Feature Flag
 
 extension ExportImportService {
