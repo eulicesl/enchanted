@@ -8,123 +8,120 @@
 #if os(macOS)
 import SwiftUI
 import KeyboardShortcuts
+import UniformTypeIdentifiers
 
 struct CompletionsEditorView: View {
     @Environment(\.presentationMode) var presentationMode
     @Binding var completions: [CompletionInstructionSD]
     @State var selectedCompletion: CompletionInstructionSD?
+    @State var selectedCategory: PromptCategory? = nil
+    @State var searchQuery: String = ""
+    @State var isExporting: Bool = false
+    @State var isImporting: Bool = false
+    @State var exportURL: URL? = nil
+    @State var importError: String? = nil
+
     var onSave: () -> ()
     var onDelete: (CompletionInstructionSD) -> ()
     var accessibilityAccess: Bool
     var requestAccessibilityAccess: () -> ()
-    
+
+    /// Filtered completions based on category and search
+    private var filteredCompletions: [CompletionInstructionSD] {
+        var result = completions
+
+        if let category = selectedCategory {
+            result = result.filter { $0.category == category }
+        }
+
+        if !searchQuery.isEmpty {
+            let query = searchQuery.lowercased()
+            result = result.filter {
+                $0.name.lowercased().contains(query) ||
+                $0.instruction.lowercased().contains(query)
+            }
+        }
+
+        return result
+    }
+
     private func close() {
         presentationMode.wrappedValue.dismiss()
     }
-    
+
     private func newCompletion() {
         let newCompletion = CompletionInstructionSD(
             name: "New Completion",
             keyboardCharacterStr: "x",
             instruction: "",
             order: completions.count,
-            modelTemperature: 0.8
+            modelTemperature: 0.8,
+            category: selectedCategory ?? .general
         )
         withAnimation {
             completions.append(newCompletion)
             selectedCompletion = newCompletion
         }
     }
-    
+
     private func discard(for completion: CompletionInstructionSD) {
         selectedCompletion = nil
         withAnimation {
             completions = completions.filter{$0.id != completion.id}
         }
     }
-    
+
+    private func exportTemplates() {
+        Task {
+            do {
+                let url = try await ExportImportService.shared.exportTemplates(completions)
+                await MainActor.run {
+                    exportURL = url
+                    isExporting = true
+                }
+            } catch {
+                await MainActor.run {
+                    importError = "Export failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func importTemplates(from url: URL) {
+        Task {
+            do {
+                let count = try await ExportImportService.shared.importTemplatesFromJSON(url: url)
+                await MainActor.run {
+                    // Reload completions
+                    CompletionsStore.shared.load()
+                    importError = nil
+                }
+            } catch {
+                await MainActor.run {
+                    importError = "Import failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading) {
-            HStack(alignment: .top) {
-                Text("Completions")
-                    .font(.title)
-                    .fontWeight(.thin)
-                    .enchantify()
-                    .padding(.bottom, 30)
-                
-                Spacer()
-                
-                Button(action: close) {
-                    Text("Close")
-                }
-                .buttonStyle(GrowingButton())
-            }
-            
-            Text("Create your own dynamic prompts usable anywhere on your mac with keyboard shortcuts to speed up common tasks. You can reorder, delete and edit your completions.")
+            headerSection
+
+            Text("Create your own dynamic prompts usable anywhere on your mac with keyboard shortcuts. Use {{VARIABLE}} syntax for template variables.")
                 .padding(.bottom, 10)
                 .fixedSize(horizontal: false, vertical: true)
-            
-            HStack(alignment: .center) {
-                KeyboardShortcuts.Recorder("Keyboard shortcut", name: .togglePanelMode)
-                Spacer()
-                Button(action: newCompletion) {
-                    Text("New Completion")
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(GrowingButton())
-            }
-            .padding(.bottom, 10)
-            
-            List {
-                ForEach($completions, editActions: .move) { $completion in
-                    HStack(alignment: .center) {
-                        CompletionButtonView(name: completion.name, keyboardCharacter: completion.keyboardCharacter, action: {})
-                        
-                        Spacer()
-                        
-                        Text(completion.instruction)
-                            .lineLimit(1)
-                            .frame(width: 500, alignment: .leading)
-                        
-                        Button(action: {
-                            selectedCompletion = completion
-                        }) {
-                            Image(systemName: "pencil")
-                        }
-                        .buttonStyle(GrowingButton())
-                        
-                        Button(action: {onDelete(completion)}) {
-                            Image(systemName: "xmark")
-                        }
-                        .buttonStyle(GrowingButton())
-                    }
-                }
-                .onMove { source , destination in
-                    completions.move(fromOffsets: source, toOffset: destination)
-                    onSave()
-                }
-            }
-            .listStyle(PlainListStyle())
-            
-            HStack {
-                Text("Completions require Accessibility access to capture selected text outside Enchanted.")
-                
-                Spacer()
-                
-                Button(action: requestAccessibilityAccess) {
-                    Text("Open Privacy Settings")
-                }
-            }
-            .padding()
-            .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(.red, lineWidth: 1)
-                )
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.opacity(0.05)))
-            .showIf(!accessibilityAccess)
+
+            toolbarSection
+
+            categoryFilterSection
+
+            completionsList
+
+            accessibilityWarning
         }
         .padding()
-        .frame(width: 800, height: 600)
+        .frame(width: 900, height: 650)
         .sheet(item: $selectedCompletion) { selectedCompletion in
             UpsertCompletionView(completion: selectedCompletion, onSave: onSave)
                 .onDisappear {
@@ -133,6 +130,233 @@ struct CompletionsEditorView: View {
                     }
                 }
         }
+        .fileExporter(
+            isPresented: $isExporting,
+            document: JSONDocument(url: exportURL),
+            contentType: .json,
+            defaultFilename: exportURL?.lastPathComponent ?? "templates.json"
+        ) { result in
+            // Handle export result
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    importTemplates(from: url)
+                }
+            case .failure(let error):
+                importError = "Failed to select file: \(error.localizedDescription)"
+            }
+        }
+        .alert("Error", isPresented: .constant(importError != nil)) {
+            Button("OK") { importError = nil }
+        } message: {
+            Text(importError ?? "")
+        }
+    }
+
+    private var headerSection: some View {
+        HStack(alignment: .top) {
+            Text("Prompt Library")
+                .font(.title)
+                .fontWeight(.thin)
+                .enchantify()
+                .padding(.bottom, 30)
+
+            Spacer()
+
+            Button(action: close) {
+                Text("Close")
+            }
+            .buttonStyle(GrowingButton())
+        }
+    }
+
+    private var toolbarSection: some View {
+        HStack(alignment: .center) {
+            KeyboardShortcuts.Recorder("Keyboard shortcut", name: .togglePanelMode)
+
+            Spacer()
+
+            // Search field
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search templates...", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .frame(width: 150)
+                if !searchQuery.isEmpty {
+                    Button(action: { searchQuery = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(6)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(6)
+
+            // Export button
+            Button(action: exportTemplates) {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(GrowingButton())
+
+            // Import button
+            Button(action: { isImporting = true }) {
+                Label("Import", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(GrowingButton())
+
+            Button(action: newCompletion) {
+                Text("New Template")
+                    .foregroundStyle(.blue)
+            }
+            .buttonStyle(GrowingButton())
+        }
+        .padding(.bottom, 10)
+    }
+
+    private var categoryFilterSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // "All" button
+                Button(action: { selectedCategory = nil }) {
+                    Label("All", systemImage: "square.grid.2x2")
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(selectedCategory == nil ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+
+                ForEach(PromptCategory.allCases) { category in
+                    Button(action: { selectedCategory = category }) {
+                        Label(category.rawValue, systemImage: category.icon)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(selectedCategory == category ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.bottom, 10)
+    }
+
+    private var completionsList: some View {
+        List {
+            ForEach(filteredCompletions.indices, id: \.self) { index in
+                let completion = filteredCompletions[index]
+                HStack(alignment: .center) {
+                    CompletionButtonView(name: completion.name, keyboardCharacter: completion.keyboardCharacter, action: {})
+
+                    // Category badge
+                    Label(completion.category.rawValue, systemImage: completion.category.icon)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(4)
+
+                    // Variable indicator
+                    if completion.hasVariables {
+                        HStack(spacing: 2) {
+                            Image(systemName: "curlybraces")
+                            Text("\(completion.extractedVariables.count)")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(4)
+                    }
+
+                    Spacer()
+
+                    Text(completion.instruction)
+                        .lineLimit(1)
+                        .frame(width: 350, alignment: .leading)
+                        .foregroundColor(.secondary)
+
+                    Button(action: {
+                        if let idx = completions.firstIndex(where: { $0.id == completion.id }) {
+                            selectedCompletion = completions[idx]
+                        }
+                    }) {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(GrowingButton())
+
+                    Button(action: { onDelete(completion) }) {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(GrowingButton())
+                    .disabled(completion.isBuiltIn)
+                    .opacity(completion.isBuiltIn ? 0.5 : 1)
+                }
+            }
+            .onMove { source, destination in
+                // Find actual indices in completions array
+                let sourceItems = source.map { filteredCompletions[$0] }
+                for item in sourceItems {
+                    if let fromIndex = completions.firstIndex(where: { $0.id == item.id }) {
+                        completions.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: destination)
+                    }
+                }
+                onSave()
+            }
+        }
+        .listStyle(PlainListStyle())
+    }
+
+    private var accessibilityWarning: some View {
+        HStack {
+            Text("Completions require Accessibility access to capture selected text outside Enchanted.")
+
+            Spacer()
+
+            Button(action: requestAccessibilityAccess) {
+                Text("Open Privacy Settings")
+            }
+        }
+        .padding()
+        .overlay(
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(.red, lineWidth: 1)
+        )
+        .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.opacity(0.05)))
+        .showIf(!accessibilityAccess)
+    }
+}
+
+// MARK: - JSON Document for Export
+struct JSONDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+
+    var url: URL?
+
+    init(url: URL?) {
+        self.url = url
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        self.url = nil
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let url = url,
+              let data = try? Data(contentsOf: url) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 
