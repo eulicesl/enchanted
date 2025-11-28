@@ -172,6 +172,24 @@ struct SidebarView: View {
         }
     }
 
+    private func handleDropConversation(_ conversationId: String, to folder: ConversationFolderSD?) {
+        guard enableOrganization else { return }
+        // Find the conversation by ID from the combined list
+        let allConversations = conversations + archivedConversations
+        guard let conversation = allConversations.first(where: { $0.id.uuidString == conversationId }) else {
+            return
+        }
+        Task {
+            do {
+                try await orgStore.setFolder(folder, for: conversation)
+            } catch {
+                await MainActor.run {
+                    organizationError = "Failed to move conversation: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Organization section (search, filters, folders)
@@ -216,7 +234,8 @@ struct SidebarView: View {
                                 onToggleExpansion: { folder in
                                     try await orgStore.toggleFolderExpansion(folder)
                                 },
-                                onManageFolders: { showFolderManagement = true }
+                                onManageFolders: { showFolderManagement = true },
+                                onDropConversation: handleDropConversation
                             )
                         } label: {
                             HStack {

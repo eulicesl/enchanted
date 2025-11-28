@@ -31,6 +31,7 @@ struct FolderTreeView: View {
     let onSelect: (ConversationFolderSD?) -> Void
     let onToggleExpansion: (ConversationFolderSD) async throws -> Void
     let onManageFolders: () -> Void
+    var onDropConversation: ((String, ConversationFolderSD?) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -50,7 +51,7 @@ struct FolderTreeView: View {
                 .buttonStyle(.borderless)
             }
 
-            // All Conversations button
+            // All Conversations button (drop here to remove from folder)
             Button {
                 onSelect(nil)
             } label: {
@@ -71,6 +72,14 @@ struct FolderTreeView: View {
                 )
             }
             .buttonStyle(.plain)
+            .dropDestination(for: String.self) { items, _ in
+                guard let conversationId = items.first,
+                      let onDropConversation = onDropConversation else {
+                    return false
+                }
+                onDropConversation(conversationId, nil)
+                return true
+            }
 
             // Folder list
             if folders.isEmpty {
@@ -84,7 +93,8 @@ struct FolderTreeView: View {
                                 selectedFolder: selectedFolder,
                                 depth: 0,
                                 onSelect: onSelect,
-                                onToggleExpansion: onToggleExpansion
+                                onToggleExpansion: onToggleExpansion,
+                                onDropConversation: onDropConversation
                             )
                         }
                     }
@@ -120,21 +130,25 @@ struct FolderRow: View {
     let depth: Int
     let onSelect: (ConversationFolderSD?) -> Void
     let onToggleExpansion: (ConversationFolderSD) async throws -> Void
+    var onDropConversation: ((String, ConversationFolderSD?) -> Void)? = nil
 
     @State private var isExpanded: Bool
+    @State private var isDropTargeted: Bool = false
 
     init(
         folder: ConversationFolderSD,
         selectedFolder: ConversationFolderSD?,
         depth: Int,
         onSelect: @escaping (ConversationFolderSD?) -> Void,
-        onToggleExpansion: @escaping (ConversationFolderSD) async throws -> Void
+        onToggleExpansion: @escaping (ConversationFolderSD) async throws -> Void,
+        onDropConversation: ((String, ConversationFolderSD?) -> Void)? = nil
     ) {
         self.folder = folder
         self.selectedFolder = selectedFolder
         self.depth = depth
         self.onSelect = onSelect
         self.onToggleExpansion = onToggleExpansion
+        self.onDropConversation = onDropConversation
         self._isExpanded = State(initialValue: folder.isExpanded)
     }
 
@@ -200,10 +214,26 @@ struct FolderRow: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+                        .fill(isSelected ? Color.accentColor.opacity(0.1) : (isDropTargeted ? Color.accentColor.opacity(0.2) : Color.clear))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isDropTargeted ? Color.accentColor : Color.clear, lineWidth: 2)
                 )
             }
             .buttonStyle(.plain)
+            .dropDestination(for: String.self) { items, _ in
+                guard let conversationId = items.first,
+                      let onDropConversation = onDropConversation else {
+                    return false
+                }
+                onDropConversation(conversationId, folder)
+                return true
+            } isTargeted: { isTargeted in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isDropTargeted = isTargeted
+                }
+            }
 
             // Subfolders
             if hasSubfolders && isExpanded {
@@ -213,7 +243,8 @@ struct FolderRow: View {
                         selectedFolder: selectedFolder,
                         depth: depth + 1,
                         onSelect: onSelect,
-                        onToggleExpansion: onToggleExpansion
+                        onToggleExpansion: onToggleExpansion,
+                        onDropConversation: onDropConversation
                     )
                 }
             }

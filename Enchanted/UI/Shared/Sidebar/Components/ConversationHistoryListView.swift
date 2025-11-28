@@ -34,6 +34,7 @@ struct ConversationHistoryList: View {
     var onArchive: ((_ conversation: ConversationSD) -> ())? = nil
     var onUnarchive: ((_ conversation: ConversationSD) -> ())? = nil
     var isArchiveView: Bool = false
+    var enableDragAndDrop: Bool = true
     
     func groupConversationsByDay(conversations: [ConversationSD]) -> [ConversationGroup] {
         let groupedDictionary = Dictionary(grouping: conversations) { (conversation) -> Date in
@@ -93,6 +94,9 @@ struct ConversationHistoryList: View {
                         .animation(.easeOut(duration: 0.15))
                     }
                     .buttonStyle(.plain)
+                    .if(enableDragAndDrop) { view in
+                        view.draggable(dailyConversation.id.uuidString)
+                    }
                     .contextMenu(menuItems: {
                         // Pin/Unpin
                         if let onTogglePin = onTogglePin, !isArchiveView {
