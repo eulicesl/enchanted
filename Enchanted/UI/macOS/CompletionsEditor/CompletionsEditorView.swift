@@ -16,9 +16,7 @@ struct CompletionsEditorView: View {
     @State var selectedCompletion: CompletionInstructionSD?
     @State var selectedCategory: PromptCategory? = nil
     @State var searchQuery: String = ""
-    @State var isExporting: Bool = false
     @State var isImporting: Bool = false
-    @State var exportURL: URL? = nil
     @State var importError: String? = nil
 
     var onSave: () -> ()
@@ -76,14 +74,24 @@ struct CompletionsEditorView: View {
             do {
                 let url = try await ExportImportService.shared.exportTemplates(completions)
                 await MainActor.run {
-                    exportURL = url
-                    isExporting = true
+                    // Use native macOS share sheet
+                    showShareSheet(for: url)
                 }
             } catch {
                 await MainActor.run {
                     importError = "Export failed: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+
+    private func showShareSheet(for url: URL) {
+        let picker = NSSharingServicePicker(items: [url])
+        if let window = NSApp.keyWindow,
+           let contentView = window.contentView {
+            // Find the export button location or use center of window
+            let rect = CGRect(x: contentView.bounds.midX, y: contentView.bounds.midY, width: 1, height: 1)
+            picker.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
         }
     }
 
@@ -129,14 +137,6 @@ struct CompletionsEditorView: View {
                         discard(for: selectedCompletion)
                     }
                 }
-        }
-        .fileExporter(
-            isPresented: $isExporting,
-            document: JSONDocument(url: exportURL),
-            contentType: .json,
-            defaultFilename: exportURL?.lastPathComponent ?? "templates.json"
-        ) { result in
-            // Handle export result
         }
         .fileImporter(
             isPresented: $isImporting,
@@ -334,29 +334,6 @@ struct CompletionsEditorView: View {
         )
         .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.opacity(0.05)))
         .showIf(!accessibilityAccess)
-    }
-}
-
-// MARK: - JSON Document for Export
-struct JSONDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-
-    var url: URL?
-
-    init(url: URL?) {
-        self.url = url
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        self.url = nil
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        guard let url = url,
-              let data = try? Data(contentsOf: url) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        return FileWrapper(regularFileWithContents: data)
     }
 }
 
