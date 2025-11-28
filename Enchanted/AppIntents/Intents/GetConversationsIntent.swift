@@ -36,6 +36,11 @@ struct GetConversationsIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<[ConversationEntity]> {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         var conversations = try await SwiftDataService.shared.fetchConversations()
 
         // Filter by search term if provided
@@ -65,6 +70,11 @@ struct GetLatestConversationIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<ConversationEntity?> {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         let conversations = try await SwiftDataService.shared.fetchConversations()
 
         guard let latest = conversations.first else {
@@ -95,6 +105,11 @@ struct SearchConversationsIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<[ConversationEntity]> & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         let conversations = try await SwiftDataService.shared.fetchConversations()
         let searchTerm = query.lowercased()
 
@@ -143,6 +158,11 @@ struct DeleteConversationIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         guard let conversationSD = try await SwiftDataService.shared.getConversation(conversation.id) else {
             throw IntentError.conversationNotFound
         }

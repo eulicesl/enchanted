@@ -46,6 +46,11 @@ struct StartConversationIntent: AppIntent {
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult & ReturnsValue<ConversationEntity> & ProvidesDialog & OpensIntent {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         // If there's an initial message, check server availability BEFORE creating the conversation
         // to prevent orphan empty conversations when server is unreachable
         if let initialMessage = initialMessage, !initialMessage.isEmpty {
@@ -122,6 +127,11 @@ struct OpenConversationIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         // The app will open and we can post a notification to select this conversation
         await MainActor.run {
             NotificationCenter.default.post(

@@ -30,6 +30,11 @@ struct GetModelsIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<[ModelEntity]> & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         // First, try to refresh models from server
         if await OllamaService.shared.reachable() {
             try? await LanguageModelStore.shared.loadModels()
@@ -71,6 +76,11 @@ struct SetDefaultModelIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         // Verify the model exists
         let models = try await SwiftDataService.shared.fetchModels()
         guard models.contains(where: { $0.name == model.id }) else {
@@ -100,6 +110,11 @@ struct GetDefaultModelIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<ModelEntity?> & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         let defaultModelName = UserDefaults.standard.string(forKey: "defaultOllamaModel") ?? ""
 
         if defaultModelName.isEmpty {
@@ -137,6 +152,11 @@ struct CheckServerStatusIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<Bool> & ProvidesDialog {
+        // Check if feature is enabled
+        guard UserDefaults.standard.bool(forKey: "feature.appIntents") else {
+            throw IntentError.featureDisabled
+        }
+
         let isReachable = await OllamaService.shared.reachable()
 
         let message = isReachable

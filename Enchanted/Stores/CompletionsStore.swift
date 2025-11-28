@@ -145,8 +145,12 @@ final class CompletionsStore {
 
     // MARK: - Feature 4: Variable Handling
 
-    /// Create a completion with variables auto-detected
+    /// Create a completion with variables auto-detected synchronously
     func createCompletionWithVariables(name: String, instruction: String, keyboardShortcut: String, temperature: Float, category: PromptCategory, description: String?) -> CompletionInstructionSD {
+        // Detect variables synchronously before creating the completion
+        // This avoids the race condition where async detection completes after return
+        let detectedVariables = detectVariablesSync(in: instruction)
+
         let completion = CompletionInstructionSD(
             name: name,
             keyboardCharacterStr: keyboardShortcut,
@@ -154,18 +158,40 @@ final class CompletionsStore {
             order: completions.count,
             modelTemperature: temperature,
             category: category,
-            variables: [],
+            variables: detectedVariables,
             authorName: nil,
             isBuiltIn: false,
             templateDescription: description
         )
 
-        // Auto-detect variables
-        Task {
-            await PromptLibraryService.shared.syncVariables(for: completion)
+        return completion
+    }
+
+    /// Synchronously detect variables in a template string
+    /// Uses the same regex pattern as PromptLibraryService
+    private func detectVariablesSync(in template: String) -> [PromptVariable] {
+        let variablePattern = "\\{\\{([A-Z_][A-Z0-9_]*)\\}\\}"
+        guard let regex = try? NSRegularExpression(pattern: variablePattern, options: []) else {
+            return []
         }
 
-        return completion
+        let range = NSRange(template.startIndex..., in: template)
+        let matches = regex.matches(in: template, options: [], range: range)
+
+        var variables: [PromptVariable] = []
+        var seen = Set<String>()
+
+        for match in matches {
+            if let varRange = Range(match.range(at: 1), in: template) {
+                let varName = String(template[varRange])
+                if !seen.contains(varName) {
+                    seen.insert(varName)
+                    variables.append(PromptVariable(name: varName, defaultValue: nil, description: nil))
+                }
+            }
+        }
+
+        return variables
     }
 
     /// Get a preview of the template with sample values
